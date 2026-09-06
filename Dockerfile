@@ -1,4 +1,12 @@
 # syntax=docker/dockerfile:1.7
+
+FROM node:22-bookworm-slim AS frontend-build
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN --mount=type=cache,target=/root/.npm npm ci
+COPY frontend/ ./
+RUN npm run build
+
 FROM python:3.14-slim AS backend-deps
 COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 \
@@ -16,9 +24,10 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONDONTWRITEBYTECODE=1
 WORKDIR /app
 RUN useradd --create-home --uid 1000 app \
-    && mkdir -p /data /import \
-    && chown app:app /data /import
+    && mkdir -p /data /import /app/static \
+    && chown app:app /data /import /app/static
 COPY --from=backend-deps --chown=app:app /app /app
+COPY --from=frontend-build --chown=app:app /frontend/dist /app/static
 RUN chmod +x /app/entrypoint.sh
 USER app
 VOLUME ["/data"]
