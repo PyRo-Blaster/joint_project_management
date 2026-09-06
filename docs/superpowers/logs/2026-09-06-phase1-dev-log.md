@@ -17,3 +17,6 @@ deviations, failures, and their resolutions are.
 ### Task 3 — Alembic migrations
 - Autogenerate produced all 8 tables with correct create/drop ordering; 2 migration tests pass.
 - **Warning fix:** Alembic 1.19 emits a `DeprecationWarning` ("No path_separator found... falling back to legacy splitting") on every run. Added `path_separator = os` to `alembic.ini [alembic]`. This matters because the same config runs in the container entrypoint; keeps startup logs clean. Warnings now 0.
+### Task 14 — import preview/commit, API, CLI
+- **Failure:** Both `test_cli.py` tests failed with exit code 2 ("Usage: import-excel [OPTIONS] {path}"). Cause: a `typer.Typer()` app with exactly ONE command collapses into a single-command CLI, so the subcommand name `import-excel` is parsed as the path argument. At Task 14 the CLI has only that one command; the plan's tests assume the subcommand form (valid once Task 16 adds more commands).
+- **Fix:** Added an empty `@cli.callback()` to force group (multi-command) mode regardless of command count. Kept in the Task 16 CLI rewrite too for robustness. Result: 107 passed. Import of the real sheet verified end-to-end: 57 items, 52 actions, 5 notes, 37 updates, re-import blocked.
