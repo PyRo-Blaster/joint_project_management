@@ -3,7 +3,6 @@
 import json
 
 import openpyxl
-
 from sqlalchemy import func, select
 from typer.testing import CliRunner
 

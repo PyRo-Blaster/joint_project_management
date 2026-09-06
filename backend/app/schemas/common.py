@@ -1,10 +1,8 @@
 """Response envelope shared by every endpoint."""
 
-from typing import Any, Generic, TypeVar
+from typing import Any
 
 from pydantic import BaseModel
-
-T = TypeVar("T")
 
 
 class Meta(BaseModel):
@@ -20,7 +18,7 @@ class ErrorBody(BaseModel):
     request_id: str | None = None
 
 
-class Envelope(BaseModel, Generic[T]):
+class Envelope[T](BaseModel):
     success: bool
     data: T | None = None
     error: ErrorBody | None = None

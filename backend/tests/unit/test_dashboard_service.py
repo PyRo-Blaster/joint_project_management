@@ -17,7 +17,9 @@ def _make(db, admin, program, **overrides):
         "owner_org": "gensci",
         "raised_on": TODAY - timedelta(days=30),
     }
-    return create_item(db, actor=admin, program=program, data=ItemCreate(**{**base, **overrides}), today=TODAY)
+    return create_item(
+        db, actor=admin, program=program, data=ItemCreate(**{**base, **overrides}), today=TODAY
+    )
 
 
 def test_summary_counts_and_needs_attention_lists(db, program, admin, vocab):

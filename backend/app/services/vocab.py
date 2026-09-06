@@ -55,7 +55,11 @@ def create_term(db: Session, *, actor: User, program: Program, data: VocabTermCr
     value = data.value.strip()
     _assert_unique(db, program.id, data.field, value)
     term = VocabTerm(
-        program_id=program.id, field=data.field, value=value, sort_order=data.sort_order, is_active=True
+        program_id=program.id,
+        field=data.field,
+        value=value,
+        sort_order=data.sort_order,
+        is_active=True,
     )
     db.add(term)
     db.flush()

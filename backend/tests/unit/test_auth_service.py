@@ -20,7 +20,12 @@ PASSWORD = "correct-horse-battery"
 @pytest.fixture
 def user(db):
     return create_user(
-        db, email="Person@Example.com", name="Person", password=PASSWORD, org="gensci", role="member"
+        db,
+        email="Person@Example.com",
+        name="Person",
+        password=PASSWORD,
+        org="gensci",
+        role="member",
     )
 
 
@@ -36,7 +41,12 @@ def test_create_user_normalizes_email_and_rejects_duplicates(db, user):
     assert user.email == "person@example.com"
     with pytest.raises(ConflictError):
         create_user(
-            db, email="PERSON@example.com", name="Again", password=PASSWORD, org="yarrow", role="member"
+            db,
+            email="PERSON@example.com",
+            name="Again",
+            password=PASSWORD,
+            org="yarrow",
+            role="member",
         )
 
 

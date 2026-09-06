@@ -107,7 +107,11 @@ def revoke_invitation(db: Session, *, actor: User, invitation: Invitation) -> In
 
 def _open_invitation(db: Session, token: str) -> Invitation:
     invitation = db.scalar(select(Invitation).where(Invitation.token_hash == hash_token(token)))
-    if invitation is None or invitation.accepted_at is not None or invitation.expires_at <= utcnow():
+    if (
+        invitation is None
+        or invitation.accepted_at is not None
+        or invitation.expires_at <= utcnow()
+    ):
         raise InvalidInputError(INVALID_LINK, fields={"token": "invalid"})
     return invitation
 

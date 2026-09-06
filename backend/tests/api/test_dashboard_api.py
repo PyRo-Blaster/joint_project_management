@@ -8,7 +8,11 @@ def test_summary_requires_auth(client, vocab):
 def test_summary_shape(member_client, vocab):
     created = member_client.post(
         "/api/items",
-        json={"title": "Formal CSA and CQA", "group": "Gen2 (Process 2.0) CMC", "owner_org": "gensci"},
+        json={
+            "title": "Formal CSA and CQA",
+            "group": "Gen2 (Process 2.0) CMC",
+            "owner_org": "gensci",
+        },
     )
     assert created.status_code == 201
     body = member_client.get("/api/dashboard/summary").json()["data"]

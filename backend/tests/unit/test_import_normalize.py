@@ -18,7 +18,10 @@ from app.schemas.imports import ImportOverrides
 
 IMPORT_DATE = date(2026, 9, 6)
 CTX = NormalizeContext(
-    groups=SEED_GROUPS, categories=SEED_CATEGORIES, overrides=ImportOverrides(), import_date=IMPORT_DATE
+    groups=SEED_GROUPS,
+    categories=SEED_CATEGORIES,
+    overrides=ImportOverrides(),
+    import_date=IMPORT_DATE,
 )
 
 
@@ -105,7 +108,9 @@ def test_normalize_action_row():
 
 def test_normalize_note_row_and_blank_status():
     note = normalize_row(
-        _raw(status="NA", priority="NA", notes_risks="THIS IS A NOTE.", due=None, status_updates=None),
+        _raw(
+            status="NA", priority="NA", notes_risks="THIS IS A NOTE.", due=None, status_updates=None
+        ),
         CTX,
     )
     assert note.kind == "note"
@@ -125,7 +130,9 @@ def test_unmapped_values_are_reported_and_overrides_resolve_them():
     assert row.unmapped == (("group", "Gen3"), ("category", "Weird"), ("owner", "formulation"))
 
     overrides = ImportOverrides(
-        group={"Gen3": "Gen1 (existing) CMC"}, category={"Weird": "QA"}, owner={"formulation": "gensci"}
+        group={"Gen3": "Gen1 (existing) CMC"},
+        category={"Weird": "QA"},
+        owner={"formulation": "gensci"},
     )
     ctx = NormalizeContext(
         groups=SEED_GROUPS, categories=SEED_CATEGORIES, overrides=overrides, import_date=IMPORT_DATE

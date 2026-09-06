@@ -18,7 +18,9 @@ def list_all(_user: CurrentUser, db: DbDep, program: ProgramDep, field: VocabFie
 
 @router.post("", response_model=Envelope[VocabTermOut], status_code=201)
 def create(payload: VocabTermCreate, admin: AdminUser, db: DbDep, program: ProgramDep):
-    return ok(VocabTermOut.model_validate(create_term(db, actor=admin, program=program, data=payload)))
+    return ok(
+        VocabTermOut.model_validate(create_term(db, actor=admin, program=program, data=payload))
+    )
 
 
 @router.patch("/{term_id}", response_model=Envelope[VocabTermOut])

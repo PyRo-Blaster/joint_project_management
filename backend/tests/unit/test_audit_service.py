@@ -38,14 +38,26 @@ def test_record_event_persists_actor_and_changes(db, program, admin):
 
 def test_list_activity_filters_and_paginates(db, program, admin, member):
     record_event(
-        db, actor=admin, entity_type="item", entity_id=1, action="created", summary="a",
+        db,
+        actor=admin,
+        entity_type="item",
+        entity_id=1,
+        action="created",
+        summary="a",
         program_id=program.id,
     )
     record_event(
-        db, actor=member, entity_type="item", entity_id=1, action="updated", summary="b",
+        db,
+        actor=member,
+        entity_type="item",
+        entity_id=1,
+        action="updated",
+        summary="b",
         program_id=program.id,
     )
-    record_event(db, actor=member, entity_type="user", entity_id=member.id, action="updated", summary="c")
+    record_event(
+        db, actor=member, entity_type="user", entity_id=member.id, action="updated", summary="c"
+    )
     db.commit()
 
     rows, total = list_activity(db, org="yarrow")

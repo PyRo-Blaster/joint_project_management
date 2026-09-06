@@ -7,7 +7,9 @@ from collections.abc import Callable
 
 
 class SlidingWindowLimiter:
-    def __init__(self, limit: int, window_seconds: float, clock: Callable[[], float] = time.monotonic):
+    def __init__(
+        self, limit: int, window_seconds: float, clock: Callable[[], float] = time.monotonic
+    ):
         self._limit = limit
         self._window = window_seconds
         self._clock = clock

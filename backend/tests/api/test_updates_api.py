@@ -29,7 +29,10 @@ def test_post_and_list_updates(member_client, vocab):
 
     listed = member_client.get(url).json()["data"]
     assert [u["body"] for u in listed] == ["GS provided comparability study protocol"]
-    assert member_client.get(f"/api/items/{item['id']}").json()["data"]["last_update_on"] == "2026-04-23"
+    assert (
+        member_client.get(f"/api/items/{item['id']}").json()["data"]["last_update_on"]
+        == "2026-04-23"
+    )
     history = member_client.get(f"/api/items/{item['id']}/history").json()["data"]
     assert history[0]["action"] == "update_posted"
     assert history[0]["changes"]["update_id"]["new"] == listed[0]["id"]
@@ -48,8 +51,12 @@ def test_only_author_or_admin_can_edit_or_delete(app, db, member_client, admin_c
     url = f"/api/items/{item['id']}/updates/{posted.json()['data']['id']}"
 
     create_user(
-        db, email="other@gensci.example", name="Other", password="other-pass-12345",
-        org="gensci", role="member",
+        db,
+        email="other@gensci.example",
+        name="Other",
+        password="other-pass-12345",
+        org="gensci",
+        role="member",
     )
     other = login_client(app, "other@gensci.example", "other-pass-12345")
     assert other.patch(url, json={"body": "hijack"}).status_code == 403
@@ -62,7 +69,11 @@ def test_only_author_or_admin_can_edit_or_delete(app, db, member_client, admin_c
     assert admin_client.delete(url).status_code == 200
     assert member_client.get(f"/api/items/{item['id']}/updates").json()["data"] == []
     history = admin_client.get(f"/api/items/{item['id']}/history").json()["data"]
-    assert [e["action"] for e in history][:3] == ["update_deleted", "update_edited", "update_posted"]
+    assert [e["action"] for e in history][:3] == [
+        "update_deleted",
+        "update_edited",
+        "update_posted",
+    ]
 
 
 def test_cannot_post_update_on_deleted_item(member_client, vocab):

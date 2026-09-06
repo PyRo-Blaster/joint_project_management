@@ -50,14 +50,18 @@ def create_app() -> FastAPI:
     async def request_context(request: Request, call_next):
         request_id = request.headers.get(REQUEST_ID_HEADER) or uuid.uuid4().hex[:12]
         request.state.request_id = request_id
-        is_api_mutation = request.method in MUTATING_METHODS and request.url.path.startswith("/api/")
+        is_api_mutation = request.method in MUTATING_METHODS and request.url.path.startswith(
+            "/api/"
+        )
         if is_api_mutation and request.headers.get(CSRF_HEADER, "").lower() != CSRF_VALUE:
             body = fail(
                 "csrf_missing",
                 f"Missing required header {CSRF_HEADER}: {CSRF_VALUE}",
                 request_id=request_id,
             )
-            return JSONResponse(status_code=403, content=body, headers={REQUEST_ID_HEADER: request_id})
+            return JSONResponse(
+                status_code=403, content=body, headers={REQUEST_ID_HEADER: request_id}
+            )
         response = await call_next(request)
         response.headers[REQUEST_ID_HEADER] = request_id
         return response
@@ -69,7 +73,9 @@ def create_app() -> FastAPI:
 
     @app.exception_handler(RequestValidationError)
     async def handle_validation_error(request: Request, exc: RequestValidationError):
-        body = fail("validation_error", "Invalid input", _validation_fields(exc), _request_id(request))
+        body = fail(
+            "validation_error", "Invalid input", _validation_fields(exc), _request_id(request)
+        )
         return JSONResponse(status_code=422, content=body)
 
     @app.exception_handler(StarletteHTTPException)

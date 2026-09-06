@@ -10,8 +10,19 @@ from app.services.errors import ImportFormatError
 from tests.conftest import FIXTURE_XLSX
 
 COLUMNS = {
-    "entry_no", "date", "group", "action_item", "translation", "owner", "category", "status",
-    "due", "priority", "status_updates", "notes_risks", "file_path",
+    "entry_no",
+    "date",
+    "group",
+    "action_item",
+    "translation",
+    "owner",
+    "category",
+    "status",
+    "due",
+    "priority",
+    "status_updates",
+    "notes_risks",
+    "file_path",
 }
 
 

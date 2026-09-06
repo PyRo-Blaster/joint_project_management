@@ -69,11 +69,17 @@ def commit_import(
     updates_created = 0
     try:
         _ensure_terms(
-            db, actor=actor, program=program, field_name="group",
+            db,
+            actor=actor,
+            program=program,
+            field_name="group",
             values_needed={row.group for row in preview.rows if row.group},
         )
         _ensure_terms(
-            db, actor=actor, program=program, field_name="category",
+            db,
+            actor=actor,
+            program=program,
+            field_name="category",
             values_needed={row.category for row in preview.rows if row.category},
         )
         for row in preview.rows:

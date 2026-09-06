@@ -9,7 +9,12 @@ def test_activity_requires_auth(client):
 
 def test_activity_lists_events_with_actor_details(admin_client, db, program, admin):
     record_event(
-        db, actor=admin, entity_type="item", entity_id=7, action="created", summary="created #7",
+        db,
+        actor=admin,
+        entity_type="item",
+        entity_id=7,
+        action="created",
+        summary="created #7",
         program_id=program.id,
     )
     db.commit()

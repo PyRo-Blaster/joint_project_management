@@ -81,9 +81,7 @@ def bootstrap() -> None:
 @cli.command("create-admin")
 def create_admin(
     email: Annotated[str, typer.Argument()],
-    password: Annotated[
-        str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)
-    ],
+    password: Annotated[str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)],
     name: Annotated[str, typer.Option()] = "Administrator",
     org: Annotated[str, typer.Option()] = "gensci",
 ) -> None:

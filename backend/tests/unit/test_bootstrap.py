@@ -21,7 +21,11 @@ def test_bootstrap_creates_everything_once(db):
         initial_import_overrides='{"owner": {"formulation": "gensci"}}',
     )
     first = run_bootstrap(db, settings)
-    assert (first.program_created, first.admin_created, first.vocab_terms_created) == (True, True, 12)
+    assert (first.program_created, first.admin_created, first.vocab_terms_created) == (
+        True,
+        True,
+        12,
+    )
     assert (first.items_imported, first.updates_imported) == (57, 37)
     assert first.skipped == ()
 

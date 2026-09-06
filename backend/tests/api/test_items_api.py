@@ -57,8 +57,14 @@ def test_list_filters_search_sort_and_pagination(member_client, vocab):
     only_blocked = member_client.get("/api/items?status=blocked").json()["data"]
     assert [i["title"] for i in only_blocked] == ["SCX category justification"]
     assert member_client.get("/api/items?q=licence").json()["meta"]["total"] == 1
-    assert member_client.get("/api/items?owner_org=joint&owner_org=yarrow").json()["meta"]["total"] == 2
-    assert member_client.get("/api/items?priority=p1").json()["data"][0]["title"] == "Cell line licence"
+    assert (
+        member_client.get("/api/items?owner_org=joint&owner_org=yarrow").json()["meta"]["total"]
+        == 2
+    )
+    assert (
+        member_client.get("/api/items?priority=p1").json()["data"][0]["title"]
+        == "Cell line licence"
+    )
 
     page = member_client.get("/api/items?limit=2&page=2&sort=entry_no&direction=desc").json()
     assert page["meta"] == {"total": 3, "page": 2, "limit": 2}
