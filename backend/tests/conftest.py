@@ -25,6 +25,19 @@ FIXTURE_XLSX = FIXTURES_DIR / "master_track_sheet_gs098.xlsx"
 ADMIN_PASSWORD = "admin-pass-12345"
 MEMBER_PASSWORD = "member-pass-12345"
 
+# The real GS098 spreadsheet is confidential and is NOT committed to the repo.
+# When it is absent (e.g. a fresh public clone), skip the tests that read it so
+# the suite still collects and passes; locally the file is present and they run.
+collect_ignore: list[str] = []
+if not FIXTURE_XLSX.exists():
+    collect_ignore = [
+        "unit/test_import_parse.py",
+        "unit/test_bootstrap.py",
+        "api/test_import_api.py",
+        "api/test_export_api.py",
+        "api/test_cli.py",
+    ]
+
 
 @pytest.fixture
 def engine(tmp_path):

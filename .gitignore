@@ -25,3 +25,7 @@ frontend/playwright-report/
 .env
 .env.*
 !.env.example
+
+# Confidential source data — provide locally, never commit
+resources/*.xlsx
+backend/tests/fixtures/*.xlsx

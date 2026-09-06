@@ -6,6 +6,12 @@ history, a dashboard, and Excel import/export.
 
 Design: `docs/superpowers/specs/2026-09-06-joint-cmc-tracker-design.md`.
 
+> **Note on data:** the source spreadsheet (`resources/Master Track Sheet-GS098.xlsx`)
+> and its test-fixture copy hold confidential program data and are intentionally
+> **not** committed. Provide your own `resources/*.xlsx` to run the initial import,
+> and place a copy at `backend/tests/fixtures/master_track_sheet_gs098.xlsx` to run
+> the import/export tests (they are skipped automatically when it is absent).
+
 ## Run it with Docker (the supported way)
 
 ```bash
