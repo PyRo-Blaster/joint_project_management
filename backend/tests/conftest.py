@@ -5,6 +5,8 @@ import os
 os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
+from pathlib import Path  # noqa: E402
+
 import pytest  # noqa: E402
 from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
@@ -14,6 +16,12 @@ from app.constants import CSRF_HEADER, CSRF_VALUE  # noqa: E402
 from app.db import get_db, make_engine, make_session_factory  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base, Program, User  # noqa: E402
+from app.services.users import create_user  # noqa: E402
+
+FIXTURES_DIR = Path(__file__).parent / "fixtures"
+FIXTURE_XLSX = FIXTURES_DIR / "master_track_sheet_gs098.xlsx"
+ADMIN_PASSWORD = "admin-pass-12345"
+MEMBER_PASSWORD = "member-pass-12345"
 
 
 @pytest.fixture
@@ -74,6 +82,47 @@ def make_client(app: FastAPI) -> TestClient:
     return TestClient(app, headers={CSRF_HEADER: CSRF_VALUE})
 
 
+def login_client(app: FastAPI, email: str, password: str) -> TestClient:
+    client = make_client(app)
+    response = client.post("/api/auth/login", json={"email": email, "password": password})
+    assert response.status_code == 200, response.text
+    return client
+
+
 @pytest.fixture
 def client(app) -> TestClient:
     return make_client(app)
+
+
+@pytest.fixture
+def admin(db, program) -> User:
+    return create_user(
+        db,
+        email="admin@gensci.example",
+        name="Ada Admin",
+        password=ADMIN_PASSWORD,
+        org="gensci",
+        role="admin",
+    )
+
+
+@pytest.fixture
+def member(db, program) -> User:
+    return create_user(
+        db,
+        email="member@yarrow.example",
+        name="Mo Member",
+        password=MEMBER_PASSWORD,
+        org="yarrow",
+        role="member",
+    )
+
+
+@pytest.fixture
+def admin_client(app, admin) -> TestClient:
+    return login_client(app, admin.email, ADMIN_PASSWORD)
+
+
+@pytest.fixture
+def member_client(app, member) -> TestClient:
+    return login_client(app, member.email, MEMBER_PASSWORD)
