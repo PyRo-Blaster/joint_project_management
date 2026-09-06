@@ -12,11 +12,13 @@ from fastapi import FastAPI  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
+import app.db as app_db  # noqa: E402
 from app.constants import CSRF_HEADER, CSRF_VALUE  # noqa: E402
 from app.db import get_db, make_engine, make_session_factory  # noqa: E402
 from app.main import create_app  # noqa: E402
 from app.models import Base, Program, User  # noqa: E402
 from app.services.users import create_user  # noqa: E402
+from app.services.vocab import seed_terms  # noqa: E402
 
 FIXTURES_DIR = Path(__file__).parent / "fixtures"
 FIXTURE_XLSX = FIXTURES_DIR / "master_track_sheet_gs098.xlsx"
@@ -36,6 +38,14 @@ def db(engine) -> Session:
     session = make_session_factory(engine)()
     yield session
     session.close()
+
+
+@pytest.fixture
+def cli_db(engine):
+    """Point the process-wide session factory (used by CLI and bootstrap) at the test engine."""
+    app_db.configure_engine(str(engine.url))
+    yield
+    app_db.reset_state()
 
 
 @pytest.fixture
@@ -116,6 +126,11 @@ def member(db, program) -> User:
         org="yarrow",
         role="member",
     )
+
+
+@pytest.fixture
+def vocab(db, program, admin) -> int:
+    return seed_terms(db, actor=admin, program=program)
 
 
 @pytest.fixture
