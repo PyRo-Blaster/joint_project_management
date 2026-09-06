@@ -6,9 +6,13 @@ os.environ.setdefault("SECRET_KEY", "test-secret-key-0123456789")
 os.environ.setdefault("DATABASE_URL", "sqlite://")
 
 import pytest  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy.orm import Session  # noqa: E402
 
-from app.db import make_engine, make_session_factory  # noqa: E402
+from app.constants import CSRF_HEADER, CSRF_VALUE  # noqa: E402
+from app.db import get_db, make_engine, make_session_factory  # noqa: E402
+from app.main import create_app  # noqa: E402
 from app.models import Base, Program, User  # noqa: E402
 
 
@@ -48,3 +52,28 @@ def raw_user(db) -> User:
     db.commit()
     db.refresh(user)
     return user
+
+
+@pytest.fixture
+def app(engine) -> FastAPI:
+    application = create_app()
+    factory = make_session_factory(engine)
+
+    def _get_db():
+        session = factory()
+        try:
+            yield session
+        finally:
+            session.close()
+
+    application.dependency_overrides[get_db] = _get_db
+    return application
+
+
+def make_client(app: FastAPI) -> TestClient:
+    return TestClient(app, headers={CSRF_HEADER: CSRF_VALUE})
+
+
+@pytest.fixture
+def client(app) -> TestClient:
+    return make_client(app)
