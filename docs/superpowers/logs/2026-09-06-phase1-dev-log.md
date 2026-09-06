@@ -20,3 +20,11 @@ deviations, failures, and their resolutions are.
 ### Task 14 — import preview/commit, API, CLI
 - **Failure:** Both `test_cli.py` tests failed with exit code 2 ("Usage: import-excel [OPTIONS] {path}"). Cause: a `typer.Typer()` app with exactly ONE command collapses into a single-command CLI, so the subcommand name `import-excel` is parsed as the path argument. At Task 14 the CLI has only that one command; the plan's tests assume the subcommand form (valid once Task 16 adds more commands).
 - **Fix:** Added an empty `@cli.callback()` to force group (multi-command) mode regardless of command count. Kept in the Task 16 CLI rewrite too for robustness. Result: 107 passed. Import of the real sheet verified end-to-end: 57 items, 52 actions, 5 notes, 37 updates, re-import blocked.
+### Task 17 — packaging, lint, coverage, smoke test
+- **Lint:** `ruff check` initially found 36 issues (32 E501, 3 import-order, 1 UP046), almost all in plan-verbatim code. Resolution: `ruff check --fix` (imports) + `ruff format` (wrapped 23 files), then manually wrapped one long docstring in `normalize.py`, and adopted PEP 695 generics for `Envelope[T]` in `schemas/common.py` (UP046). Pydantic 2.13 handles the native generic fine. Tests still 118 passed after reformat.
+- **Coverage:** 93.26% (gate 80%). 118 tests.
+- **Smoke test:** Docker daemon was started mid-session (`open -a Docker`). First image build ~220s (base-image pulls + uv sync). `scripts/smoke.sh` passed end-to-end: image built, container healthy, `/api/health` returned `database: ok`, admin login worked, and the initial import produced 57 items. Container and volume torn down by the script's cleanup trap.
+
+## Phase 1 result
+All 17 tasks complete. 118 backend tests passing, ruff clean, coverage 93%, container smoke test green.
+Validated: `docker compose up -d` yields an authenticated API with the GS098 sheet imported.
