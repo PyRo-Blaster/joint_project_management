@@ -20,7 +20,7 @@ Replace the shared Excel "Master Track Sheet" with a web app that both teams
 
 | Topic | Decision |
 |---|---|
-| Deployment | Local machine first; packaging must make later VPS/on-prem deployment a configuration change, not a rewrite. |
+| Deployment | Docker-first. `docker compose up -d` is the only supported way to run the app, locally and on a server. One application image, SQLite on a volume by default; PostgreSQL and an HTTPS proxy are optional compose profiles. Nothing is built on the server. |
 | Excel | One-time import. The app is the master afterwards. Export xlsx on demand. |
 | Programs | Single program (GS098) in the UI. A `program` entity exists so more programs can be added later without a migration of item data. |
 | Accounts | Invite-only. Roles: `admin`, `member`. Each user is tagged `gensci` or `yarrow`. |
@@ -44,7 +44,9 @@ Replace the shared Excel "Master Track Sheet" with a web app that both teams
 - Kanban board with drag-and-drop between status columns.
 - Dashboard: stat tiles, needs-attention list, activity feed, breakdowns.
 - Excel import (preview → commit) and export.
-- Docker packaging and a short deployment note.
+- Docker-first packaging: single image, compose file, self-configuring
+  startup (migrate, seed admin, optional initial import), optional Postgres
+  and HTTPS profiles, health check, and a deployment note.
 
 ### Out of scope for v1 (model leaves room)
 
@@ -82,7 +84,10 @@ joint_cmc_management/
 │   │   ├── components/ui/   # shadcn-style primitives
 │   │   └── lib/             # typed API client, formatting, constants
 │   └── e2e/                 # Playwright
-├── docker/                  # Dockerfile (multi-stage), docker-compose.yml
+├── Dockerfile               # multi-stage: node build → uv deps → slim runtime
+├── docker-compose.yml       # app service + optional `postgres` and `proxy` profiles
+├── .env.example             # every variable, documented
+├── .github/workflows/       # tests on push; build + publish image on tag
 ├── docs/superpowers/specs/  # this document and its successors
 └── resources/               # original spreadsheet
 ```
@@ -96,11 +101,44 @@ Principles:
 - **Engine-neutral schema.** Only column types and constraints that behave
   the same on SQLite and PostgreSQL are used (`JSON` column via SQLAlchemy,
   no arrays, no partial indexes). One `DATABASE_URL` switches engines.
-- **Dev vs prod serving.** In dev, FastAPI runs on :8000 and Vite on :5173
-  with a proxy for `/api`. In prod, a multi-stage Dockerfile builds the
-  frontend and FastAPI serves `dist/` as static files behind the same origin.
+- **One image, one command.** A multi-stage Dockerfile builds the frontend
+  in a Node stage, installs backend dependencies with uv in a second stage,
+  and copies both into a slim Python runtime image that serves the API and
+  the built frontend on one port. For hot-reload development FastAPI (:8000)
+  and Vite (:5173, proxying `/api`) can also run directly on the host; that
+  is a convenience, not a deployment path.
 - **Small files.** Target 200–400 lines per module, 800 max. Split by
   feature, not by layer, within `features/` and `services/`.
+
+### Deployment
+
+Goal: a new server needs Docker and one directory containing
+`docker-compose.yml` and `.env`. No build tools, no manual migration, seed,
+or import steps.
+
+- **Startup is self-configuring and idempotent.** The container entrypoint
+  runs `alembic upgrade head`; creates the first admin from `ADMIN_EMAIL` and
+  `ADMIN_PASSWORD` if no users exist; seeds the GS098 program and vocab terms
+  if missing; and, when `INITIAL_IMPORT_PATH` points at a mounted xlsx and the
+  program has no items, imports it. Restarts and upgrades are therefore just
+  `docker compose pull && docker compose up -d`.
+- **SQLite by default.** The database file lives on a named volume
+  `app-data`, so a backup is a copy of one file. `--profile postgres` adds a
+  PostgreSQL service and points `DATABASE_URL` at it; the same migrations
+  apply.
+- **HTTPS is one flag.** `--profile proxy` adds a Caddy service that
+  terminates TLS for `DOMAIN` with automatic certificates. Without it the app
+  listens on `APP_PORT` (default 8000) for use on an intranet or behind an
+  existing reverse proxy.
+- **Images are built once, never on the server.** `docker compose build` on
+  a developer machine, then either push to a registry (the GitHub Actions
+  workflow publishes to GHCR on version tags) or `docker save` to a tarball
+  that is copied and `docker load`ed where registry access is slow or
+  blocked. `docker-compose.yml` references the image by tag; the Dockerfile
+  is only needed to build.
+- **Health check.** `GET /api/health` returns version and database status;
+  compose uses it as `healthcheck`, so `docker compose ps` shows readiness
+  and the proxy waits for it.
 
 ## 5. Data model
 
@@ -389,14 +427,26 @@ keeps DTOs in sync.
 - Login rate limit: 5 attempts per minute per email and per IP.
 - Invitation/reset tokens: 32 random bytes, stored hashed, single use,
   time-limited.
-- `SECRET_KEY` and `DATABASE_URL` are required at startup; the app refuses
-  to boot without them. No secrets in the repo; `.env.example` documents
-  every variable.
+- `SECRET_KEY` is required at startup; the app refuses to boot without it.
+  `ADMIN_PASSWORD` is read only when no users exist and is never logged.
+  No secrets in the repo; `.env.example` documents every variable.
 - CORS allowed only for the Vite dev origin in development.
 
-Configuration (`.env`): `DATABASE_URL`, `SECRET_KEY`, `APP_ORIGIN`,
-`SESSION_TTL_HOURS=72`, `INVITE_TTL_DAYS=7`, `DUE_SOON_DAYS=14`,
-`STALE_DAYS=14`, `LOG_LEVEL=info`.
+Configuration (`.env`):
+
+| Variable | Default | Purpose |
+|---|---|---|
+| `SECRET_KEY` | required | session signing |
+| `DATABASE_URL` | `sqlite:////data/app.db` | switch to Postgres with the `postgres` profile |
+| `APP_ORIGIN` | `http://localhost:8000` | used for invitation links and CORS |
+| `APP_PORT` | `8000` | host port mapped by compose |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | none | first admin, created only when no users exist |
+| `INITIAL_IMPORT_PATH` | none | mounted xlsx imported once when the program has no items |
+| `DOMAIN` | none | `proxy` profile only; Caddy obtains certificates for it |
+| `SESSION_TTL_HOURS` | `72` | |
+| `INVITE_TTL_DAYS` | `7` | |
+| `DUE_SOON_DAYS`, `STALE_DAYS` | `14` | dashboard thresholds |
+| `LOG_LEVEL` | `info` | |
 
 ## 13. Testing
 
@@ -413,19 +463,25 @@ Configuration (`.env`): `DATABASE_URL`, `SECRET_KEY`, `APP_ORIGIN`,
 - **E2E**: Playwright: seed admin → invite member → accept → member logs in
   → creates item → posts update → drags card to In progress → dashboard
   shows the activity.
+- **Container smoke test**: build the image, `docker compose up -d` with a
+  throwaway `.env`, wait for the health check, log in as the seeded admin,
+  and confirm the initial import produced 57 items. Runs in CI on every push.
 - Coverage gate: 80% on backend; frontend measured but not gated in v1.
 
 ## 14. Phasing
 
-1. **Backend core** — project scaffold, config, models, migrations, auth,
-   users/invitations, items, updates, vocab, audit, dashboard summary, CLI
-   seed and import, tests. Deliverable: working API with the spreadsheet
-   imported.
+1. **Backend core, shipped in a container** — project scaffold, Dockerfile,
+   compose file, self-configuring entrypoint, health endpoint, config,
+   models, migrations, auth, users/invitations, items, updates, vocab,
+   audit, dashboard summary, CLI import, tests. Deliverable:
+   `docker compose up -d` yields a working API with the spreadsheet imported.
 2. **Frontend core** — app shell, login/accept, items table, item detail,
-   timeline, history. Deliverable: both teams can use it locally.
+   timeline, history, built into the same image. Deliverable: both teams can
+   use it from one container.
 3. **Board, dashboard, admin** — Kanban, dashboard, users/invites/vocab
    screens, import/export UI, generated API client, frontend tests.
-4. **Packaging** — Dockerfile, compose with Postgres, deployment note,
-   Playwright e2e in CI script.
+4. **Release hardening** — CI workflow (tests, container smoke test, image
+   publish on tag), Playwright e2e, `postgres` and `proxy` profiles verified,
+   deployment note with the registry and tarball paths.
 
 Each phase gets its own implementation plan.
