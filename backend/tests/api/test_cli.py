@@ -2,6 +2,8 @@
 
 import json
 
+import openpyxl
+
 from sqlalchemy import func, select
 from typer.testing import CliRunner
 
@@ -27,3 +29,12 @@ def test_import_excel_commit_with_overrides(cli_db, program, admin, vocab, db):
     assert result.exit_code == 0, result.output
     assert "imported 57 items and 37 updates" in result.output
     assert db.scalar(select(func.count()).select_from(ActionItem)) == 57
+
+
+def test_export_excel_writes_a_workbook(cli_db, program, admin, vocab, tmp_path):
+    overrides = json.dumps({"owner": {"formulation": "gensci"}})
+    runner.invoke(cli, ["import-excel", str(FIXTURE_XLSX), "--overrides", overrides, "--commit"])
+    out = tmp_path / "export.xlsx"
+    result = runner.invoke(cli, ["export-excel", str(out)])
+    assert result.exit_code == 0, result.output
+    assert openpyxl.load_workbook(out)["Action Item"].max_row == 58

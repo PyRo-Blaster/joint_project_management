@@ -14,7 +14,9 @@ from app.db import session_scope
 from app.importers.excel.commit import run_import
 from app.importers.excel.preview import ImportPreview
 from app.models import Program, User
+from app.exporters.excel import build_program_export
 from app.schemas.imports import ImportOverrides
+from app.services.items import ItemFilters
 from app.services.errors import DomainError
 
 cli = typer.Typer(help="Joint CMC tracker maintenance commands", no_args_is_help=True)
@@ -100,6 +102,15 @@ def import_excel(
         f"imported {result.items_created} items and {result.updates_created} updates "
         f"(audit event {result.audit_event_id})"
     )
+
+
+@cli.command("export-excel")
+def export_excel(out: Annotated[Path, typer.Argument(dir_okay=False)]) -> None:
+    """Write every item to an xlsx file in the original column layout."""
+    with session_scope() as db:
+        content = build_program_export(db, _program(db).id, ItemFilters())
+    out.write_bytes(content)
+    typer.echo(f"wrote {out}")
 
 
 if __name__ == "__main__":
