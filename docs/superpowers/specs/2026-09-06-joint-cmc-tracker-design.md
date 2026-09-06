@@ -440,8 +440,10 @@ Configuration (`.env`):
 | `DATABASE_URL` | `sqlite:////data/app.db` | switch to Postgres with the `postgres` profile |
 | `APP_ORIGIN` | `http://localhost:8000` | used for invitation links and CORS |
 | `APP_PORT` | `8000` | host port mapped by compose |
-| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | none | first admin, created only when no users exist |
+| `ADMIN_EMAIL`, `ADMIN_PASSWORD` | none | first admin, created only when no users exist (password ≥ 10 chars) |
+| `ADMIN_ORG` | `gensci` | org tag of the first admin |
 | `INITIAL_IMPORT_PATH` | none | mounted xlsx imported once when the program has no items |
+| `INITIAL_IMPORT_OVERRIDES` | `{}` | JSON mapping of raw → canonical values for the initial import, e.g. `{"owner": {"formulation": "gensci"}}` |
 | `DOMAIN` | none | `proxy` profile only; Caddy obtains certificates for it |
 | `SESSION_TTL_HOURS` | `72` | |
 | `INVITE_TTL_DAYS` | `7` | |
