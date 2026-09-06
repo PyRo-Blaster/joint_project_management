@@ -1,0 +1,16 @@
+services:
+  app:
+    image: joint-cmc-tracker:${APP_VERSION:-latest}
+    build:
+      context: .
+    env_file:
+      - ${ENV_FILE:-.env}
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    volumes:
+      - app-data:/data
+      - ./resources:/import:ro
+    restart: unless-stopped
+
+volumes:
+  app-data:
