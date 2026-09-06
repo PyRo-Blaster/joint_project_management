@@ -11,3 +11,6 @@ deviations, failures, and their resolutions are.
 
 ## Task-by-task notes
 
+### Task 2 — models & DB
+- **Failure:** After adding `tests/conftest.py` (which does `os.environ.setdefault("DATABASE_URL", "sqlite://")` as an in-memory safety net), `test_config.py::test_documented_defaults` failed: it asserts the built-in default `sqlite:////data/app.db`, but pydantic-settings reads `os.environ` regardless of `_env_file=None`, so the conftest's env var won.
+- **Fix:** Added `monkeypatch.delenv("DATABASE_URL", raising=False)` in that test — it verifies the default, so it must guarantee the var is unset. Kept the conftest safety net (prevents accidental engine creation against `/data`). Result: 9 passed.
