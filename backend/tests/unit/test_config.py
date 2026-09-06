@@ -20,6 +20,7 @@ def test_short_secret_key_is_rejected(monkeypatch):
 
 def test_documented_defaults(monkeypatch):
     monkeypatch.setenv("SECRET_KEY", "a-long-enough-secret-key")
+    monkeypatch.delenv("DATABASE_URL", raising=False)
     settings = Settings(_env_file=None)
     assert settings.database_url == "sqlite:////data/app.db"
     assert settings.session_ttl_hours == 72
