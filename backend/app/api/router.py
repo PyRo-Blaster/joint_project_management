@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.api import activity, auth, health, invitations, items, updates, users, vocab
+from app.api import activity, auth, dashboard, health, invitations, items, updates, users, vocab
 
 api_router = APIRouter()
 api_router.include_router(health.router)
@@ -11,3 +11,4 @@ api_router.include_router(invitations.router)
 api_router.include_router(vocab.router)
 api_router.include_router(items.router)
 api_router.include_router(updates.router)
+api_router.include_router(dashboard.router)
