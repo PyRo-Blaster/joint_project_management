@@ -4,6 +4,7 @@ from app.api import (
     activity,
     auth,
     dashboard,
+    exports,
     health,
     imports,
     invitations,
@@ -24,3 +25,4 @@ api_router.include_router(items.router)
 api_router.include_router(updates.router)
 api_router.include_router(dashboard.router)
 api_router.include_router(imports.router)
+api_router.include_router(exports.router)
