@@ -2,10 +2,10 @@
 
 from pathlib import Path
 
-from alembic import command
 from alembic.config import Config
 from sqlalchemy import create_engine, inspect
 
+from alembic import command
 from tests.unit.test_models import EXPECTED_TABLES
 
 BACKEND_DIR = Path(__file__).resolve().parents[2]

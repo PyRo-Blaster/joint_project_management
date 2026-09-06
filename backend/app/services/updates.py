@@ -124,7 +124,10 @@ def delete_update(db: Session, *, actor: User, item: ActionItem, update: ItemUpd
         entity_id=item.id,
         action="update_deleted",
         summary=f"deleted an update on #{item.entry_no}",
-        changes={"update_id": {"old": update.id, "new": None}, "body": {"old": update.body, "new": None}},
+        changes={
+            "update_id": {"old": update.id, "new": None},
+            "body": {"old": update.body, "new": None},
+        },
         program_id=item.program_id,
     )
     db.delete(update)

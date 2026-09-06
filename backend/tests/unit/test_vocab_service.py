@@ -8,7 +8,14 @@ from sqlalchemy import select
 from app.constants import SEED_CATEGORIES, SEED_GROUPS
 from app.models import ActionItem, AuditEvent
 from app.schemas.vocab import VocabTermPatch
-from app.services.vocab import active_values, list_terms, match_value, seed_terms, update_term, vocab_key
+from app.services.vocab import (
+    active_values,
+    list_terms,
+    match_value,
+    seed_terms,
+    update_term,
+    vocab_key,
+)
 
 
 @pytest.mark.parametrize(
@@ -61,7 +68,9 @@ def test_rename_term_rewrites_items_and_audits(db, program, admin, vocab):
     db.refresh(item)
     assert item.group == "General"
     event = db.scalars(
-        select(AuditEvent).where(AuditEvent.entity_type == "vocab_term", AuditEvent.action == "updated")
+        select(AuditEvent).where(
+            AuditEvent.entity_type == "vocab_term", AuditEvent.action == "updated"
+        )
     ).one()
     assert event.changes["value"] == {"old": "General Issues", "new": "General"}
     assert event.changes["items_rewritten"]["new"] == 1

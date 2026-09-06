@@ -10,9 +10,7 @@ from app.services.auth import hash_password, normalize_email
 from app.services.errors import ConflictError, ForbiddenError, NotFoundError
 
 
-def create_user(
-    db: Session, *, email: str, name: str, password: str, org: str, role: str
-) -> User:
+def create_user(db: Session, *, email: str, name: str, password: str, org: str, role: str) -> User:
     normalized = normalize_email(email)
     if db.scalar(select(User).where(User.email == normalized)) is not None:
         raise ConflictError(f"A user with email {normalized} already exists")
@@ -42,7 +40,9 @@ def get_user(db: Session, user_id: int) -> User:
 
 
 def count_active_admins(db: Session) -> int:
-    stmt = select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))
+    stmt = (
+        select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))
+    )
     return db.scalar(stmt) or 0
 
 

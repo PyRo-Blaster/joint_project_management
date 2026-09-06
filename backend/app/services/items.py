@@ -31,7 +31,17 @@ SNAPSHOT_FIELDS = (
     "file_path",
 )
 SORTABLE = frozenset(
-    {"entry_no", "title", "group", "owner_org", "status", "priority", "raised_on", "due_on", "updated_at"}
+    {
+        "entry_no",
+        "title",
+        "group",
+        "owner_org",
+        "status",
+        "priority",
+        "raised_on",
+        "due_on",
+        "updated_at",
+    }
 )
 
 
@@ -107,7 +117,9 @@ def list_items(
     return list(rows), total
 
 
-def get_item(db: Session, program_id: int, item_id: int, *, include_deleted: bool = False) -> ActionItem:
+def get_item(
+    db: Session, program_id: int, item_id: int, *, include_deleted: bool = False
+) -> ActionItem:
     item = db.get(ActionItem, item_id)
     hidden = item is not None and item.deleted_at is not None and not include_deleted
     if item is None or item.program_id != program_id or hidden:

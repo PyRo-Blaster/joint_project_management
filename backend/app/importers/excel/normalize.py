@@ -97,7 +97,10 @@ def parse_priority(value: Any) -> str | None:
 
 
 def split_updates(value: Any, fallback: date) -> tuple[UpdateDraft, ...]:
-    """Split 'UPDATE-YYYYMMDD: body' markers into dated drafts; unmarked text is dated `fallback`."""
+    """Split 'UPDATE-YYYYMMDD: body' markers into dated drafts.
+
+    Unmarked text is dated `fallback`.
+    """
     if is_blank(value):
         return ()
     parts = UPDATE_MARKER_RE.split(text(value))

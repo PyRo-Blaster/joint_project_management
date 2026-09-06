@@ -9,9 +9,20 @@ from tests.conftest import FIXTURE_XLSX
 
 XLSX_MIME = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 EXPECTED_HEADER = (
-    "Entry No.", "Date", "Group", "Action Item", "Owner", "CMC Category", "Status",
-    "Checkpoint/DDL", "Priority", "Status Updates", "Notes/Risks", "File Path",
-    "Last Updated", "Updated By",
+    "Entry No.",
+    "Date",
+    "Group",
+    "Action Item",
+    "Owner",
+    "CMC Category",
+    "Status",
+    "Checkpoint/DDL",
+    "Priority",
+    "Status Updates",
+    "Notes/Risks",
+    "File Path",
+    "Last Updated",
+    "Updated By",
 )
 
 
