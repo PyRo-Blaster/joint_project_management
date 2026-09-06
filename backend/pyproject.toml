@@ -1,0 +1,53 @@
+[project]
+name = "cmc-tracker-backend"
+version = "0.1.0"
+description = "Backend API for the GS098 joint CMC action tracker"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.141,<1",
+    "uvicorn>=0.52",
+    "sqlalchemy>=2.0.52,<3",
+    "alembic>=1.19",
+    "pydantic[email]>=2.13",
+    "pydantic-settings>=2.15",
+    "argon2-cffi>=25.1",
+    "openpyxl>=3.1.5",
+    "typer>=0.27",
+    "python-multipart>=0.0.32",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1",
+    "pytest-cov>=7.1",
+    "httpx>=0.28",
+    "ruff>=0.16",
+]
+
+[tool.uv]
+package = false
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.coverage.run]
+source = ["app"]
+branch = true
+
+[tool.coverage.report]
+fail_under = 80
+show_missing = true
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = [
+    "fastapi.Depends", "fastapi.Query", "fastapi.File", "fastapi.Form",
+    "typer.Argument", "typer.Option",
+]
