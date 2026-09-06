@@ -10,14 +10,17 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.constants import MIN_PASSWORD_LENGTH, ORGS
 from app.db import session_scope
+from app.exporters.excel import build_program_export
 from app.importers.excel.commit import run_import
 from app.importers.excel.preview import ImportPreview
 from app.models import Program, User
-from app.exporters.excel import build_program_export
 from app.schemas.imports import ImportOverrides
-from app.services.items import ItemFilters
+from app.services.bootstrap import run_bootstrap
 from app.services.errors import DomainError
+from app.services.items import ItemFilters
+from app.services.users import create_user
 
 cli = typer.Typer(help="Joint CMC tracker maintenance commands", no_args_is_help=True)
 
@@ -59,6 +62,43 @@ def _print_preview(preview: ImportPreview) -> None:
         typer.echo(f"  unmapped {field_name}: {', '.join(values)}")
     for error in preview.errors:
         typer.echo(f"  error: {error}")
+
+
+@cli.command()
+def bootstrap() -> None:
+    """Idempotent startup: program, first admin from env, vocab, optional initial import."""
+    with session_scope() as db:
+        report = run_bootstrap(db, get_settings())
+    typer.echo(
+        f"program created: {report.program_created}; admin created: {report.admin_created}; "
+        f"vocab terms created: {report.vocab_terms_created}; "
+        f"items imported: {report.items_imported}; updates imported: {report.updates_imported}"
+    )
+    for reason in report.skipped:
+        typer.echo(f"  skipped: {reason}")
+
+
+@cli.command("create-admin")
+def create_admin(
+    email: Annotated[str, typer.Argument()],
+    password: Annotated[
+        str, typer.Option(prompt=True, hide_input=True, confirmation_prompt=True)
+    ],
+    name: Annotated[str, typer.Option()] = "Administrator",
+    org: Annotated[str, typer.Option()] = "gensci",
+) -> None:
+    """Create an additional admin account (prompts for the password if not given)."""
+    if len(password) < MIN_PASSWORD_LENGTH:
+        raise typer.BadParameter(f"password must be at least {MIN_PASSWORD_LENGTH} characters")
+    if org not in ORGS:
+        raise typer.BadParameter(f"org must be one of {ORGS}")
+    with session_scope() as db:
+        try:
+            user = create_user(db, email=email, name=name, password=password, org=org, role="admin")
+        except DomainError as exc:
+            typer.echo(f"error: {exc.message}")
+            raise typer.Exit(code=1) from exc
+    typer.echo(f"created admin {user.email} (id {user.id})")
 
 
 @cli.command("import-excel")

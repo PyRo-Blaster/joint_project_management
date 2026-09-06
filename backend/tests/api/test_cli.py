@@ -8,7 +8,8 @@ from sqlalchemy import func, select
 from typer.testing import CliRunner
 
 from app.cli import cli
-from app.models import ActionItem
+from app.config import get_settings
+from app.models import ActionItem, User
 from tests.conftest import FIXTURE_XLSX
 
 runner = CliRunner()
@@ -38,3 +39,26 @@ def test_export_excel_writes_a_workbook(cli_db, program, admin, vocab, tmp_path)
     result = runner.invoke(cli, ["export-excel", str(out)])
     assert result.exit_code == 0, result.output
     assert openpyxl.load_workbook(out)["Action Item"].max_row == 58
+
+
+def test_bootstrap_command_is_idempotent(cli_db, monkeypatch):
+    monkeypatch.setenv("ADMIN_EMAIL", "boss@gensci.example")
+    monkeypatch.setenv("ADMIN_PASSWORD", "bootstrap-pass-1")
+    get_settings.cache_clear()
+    try:
+        first = runner.invoke(cli, ["bootstrap"])
+        assert first.exit_code == 0, first.output
+        assert "admin created: True" in first.output
+        second = runner.invoke(cli, ["bootstrap"])
+        assert "admin created: False" in second.output
+    finally:
+        get_settings.cache_clear()
+
+
+def test_create_admin_command(cli_db, db):
+    result = runner.invoke(
+        cli,
+        ["create-admin", "ops@yarrow.example", "--org", "yarrow", "--password", "ops-pass-12345"],
+    )
+    assert result.exit_code == 0, result.output
+    assert db.scalar(select(User).where(User.email == "ops@yarrow.example")).role == "admin"
