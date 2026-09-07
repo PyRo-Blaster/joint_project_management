@@ -65,3 +65,19 @@ deviations, failures, and their resolutions are.
   green; the real pages are wired in T10 and T13.
 - Gates: `npm test` 16 passed (9 files); `npm run build` clean. Bundle ~509 kB (159 kB gzip) —
   Vite's >500 kB note is informational; code-splitting is a Phase 3/hardening concern.
+
+### T9–T11 — items table + filters
+- **Fix (ItemsTable test):** a note row renders "Note" in both the Kind badge and the Status
+  column (status is null → "Note"), so `getByText("Note")` matched two nodes. Switched to
+  `getAllByText("Note")`. This is intended UI, not a bug.
+- **Key finding — Radix overlays deadlock jsdom.** Opening any Radix overlay (Popover / Select /
+  DropdownMenu) under jsdom hangs the event loop *synchronously* — vitest's own per-test timeout
+  can't fire (a known Radix FocusScope/jsdom interaction). Added `matchMedia`, pointer-capture,
+  `scrollIntoView`, `PointerEvent`, and `ResizeObserver` stubs to `test/setup.ts` (all needed for
+  Radix to render at all), but click-to-open still hard-hangs. **Rendering closed overlays is
+  fine** — only opening them hangs — so every other component test (ItemForm/detail/updates/
+  history) renders closed selects or clicks plain buttons and is unaffected. Reworked the
+  FilterBar test to cover the debounced search, the active-count badge (reflects `selected`
+  without opening), and the clear affordance. The open→select interaction is verified against the
+  real dev server instead.
+- Gates: items suite 7 passed; `npm test` all green; typecheck + build clean.
