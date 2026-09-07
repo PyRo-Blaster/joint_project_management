@@ -1,4 +1,15 @@
 # syntax=docker/dockerfile:1.7
+
+# 1) Build the frontend into static assets. openapi.json and src/lib/api/schema.d.ts are
+#    committed, so this stage needs no running backend.
+FROM node:22-slim AS frontend-build
+WORKDIR /frontend
+COPY frontend/package.json frontend/package-lock.json ./
+RUN npm ci
+COPY frontend/ ./
+RUN npm run build
+
+# 2) Install backend dependencies with uv.
 FROM python:3.14-slim AS backend-deps
 COPY --from=ghcr.io/astral-sh/uv:0.11.28 /uv /uvx /bin/
 ENV UV_COMPILE_BYTECODE=1 \
@@ -10,6 +21,7 @@ COPY backend/pyproject.toml backend/uv.lock ./
 RUN --mount=type=cache,target=/root/.cache/uv uv sync --frozen --no-dev
 COPY backend/ ./
 
+# 3) Slim runtime serving the API and the built frontend on one port.
 FROM python:3.14-slim AS runtime
 ENV PATH="/app/.venv/bin:$PATH" \
     PYTHONUNBUFFERED=1 \
@@ -19,6 +31,7 @@ RUN useradd --create-home --uid 1000 app \
     && mkdir -p /data /import \
     && chown app:app /data /import
 COPY --from=backend-deps --chown=app:app /app /app
+COPY --from=frontend-build --chown=app:app /frontend/dist /app/static
 RUN chmod +x /app/entrypoint.sh
 USER app
 VOLUME ["/data"]

@@ -34,6 +34,23 @@ def _validation_fields(exc: RequestValidationError) -> dict[str, str]:
     return fields
 
 
+class SPAStaticFiles(StaticFiles):
+    """Serve the built SPA, falling back to index.html for client-side routes.
+
+    Unknown ``/api/*`` paths keep the JSON envelope 404 instead of the SPA shell.
+    """
+
+    async def get_response(self, path: str, scope):
+        if path == "api" or path.startswith("api/"):
+            raise StarletteHTTPException(status_code=404, detail="Not Found")
+        try:
+            return await super().get_response(path, scope)
+        except StarletteHTTPException as exc:
+            if exc.status_code == 404:
+                return await super().get_response("index.html", scope)
+            raise
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
@@ -96,7 +113,7 @@ def create_app() -> FastAPI:
 
     static_dir = Path(settings.static_dir)
     if static_dir.is_dir():
-        app.mount("/", StaticFiles(directory=str(static_dir), html=True), name="static")
+        app.mount("/", SPAStaticFiles(directory=str(static_dir), html=True), name="static")
     else:
 
         @app.get("/", include_in_schema=False)
