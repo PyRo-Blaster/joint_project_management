@@ -75,14 +75,16 @@ Deliverable: `docker compose up -d` yields an authenticated API with the GS098 s
 
 Deliverable: both teams use it from one container. Add a Node build stage to the Dockerfile and serve `static/`.
 
-- [ ] Write the Phase 2 implementation plan (writing-plans skill).
-- [ ] Vite + React + TS + Tailwind scaffold; app shell (router, providers, layout).
-- [ ] Generated TypeScript client from the FastAPI OpenAPI schema.
-- [ ] Auth: login page, accept-invite/reset page, session-expiry redirect, global error boundary.
-- [ ] Items table: sortable columns, filter bar, search, column visibility, URL-synced filters.
-- [ ] Item detail (side sheet + deep-link route): editable fields, update timeline compose box, History tab with audit diffs.
-- [ ] Envelope-aware API layer (TanStack Query, react-hook-form + zod), inline field errors + toasts.
-- [ ] Dockerfile Node stage builds frontend into `static/`; single container serves API + UI.
+- **Phase 2 plan:** `docs/superpowers/plans/2026-09-06-phase2-frontend-core.md`
+
+- [x] Write the Phase 2 implementation plan (writing-plans skill).
+- [x] Vite + React + TS + Tailwind scaffold; app shell (router, providers, layout).
+- [x] Generated TypeScript client from the FastAPI OpenAPI schema.
+- [x] Auth: login page, accept-invite/reset page, session-expiry redirect, global error boundary.
+- [x] Items table: sortable columns, filter bar, search, column visibility, URL-synced filters.
+- [x] Item detail (side sheet + deep-link route): editable fields, update timeline compose box, History tab with audit diffs.
+- [x] Envelope-aware API layer (TanStack Query, react-hook-form + zod), inline field errors + toasts.
+- [x] Dockerfile Node stage builds frontend into `static/`; single container serves API + UI.
 
 ## Phase 3 — Board, dashboard, admin (own plan required)
 
