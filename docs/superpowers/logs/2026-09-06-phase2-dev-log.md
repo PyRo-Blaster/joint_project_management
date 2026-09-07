@@ -81,3 +81,37 @@ deviations, failures, and their resolutions are.
   without opening), and the clear affordance. The open→select interaction is verified against the
   real dev server instead.
 - Gates: items suite 7 passed; `npm test` all green; typecheck + build clean.
+
+### T12–T13 — item create + detail
+- **Fix (`ItemDetailPage` Button `asChild`):** same as `NotFound` — styled the `Link` with
+  `buttonVariants()` instead of the unsupported `<Button asChild>`.
+- Reused `ItemForm` for both the New-item dialog and the detail Details tab (via
+  `itemToFormValues`). `kind` is sent on PATCH but ignored server-side (immutable). Confirmed
+  that rendering `ItemDetail` (which mounts ItemForm's closed Radix selects) does **not** hang —
+  only *opening* a Radix overlay hangs jsdom. 3 tests passed.
+
+### T14–T15 — updates + history
+- No surprises. Timeline compose/edit/delete and the audit-diff history render via plain buttons
+  (no overlays), so tests are fast and reliable. item-detail suite green.
+
+### T16–T17 — serve SPA from container + final gates
+- **SPA fallback:** added `SPAStaticFiles` to `app/main.py`; RED (`/items/42` → 404) → GREEN.
+  Backend **100 passed** (was 99), ruff clean. The existing `/api` envelope-404 test still passes
+  (the fallback re-raises for `api/*`).
+- **End-to-end validation without Docker** (the sandbox has the docker CLI but no daemon): built
+  the frontend, copied `dist` → `backend/static`, ran uvicorn on 3.13.12, and curled:
+  `/api/health` → `database: ok`; `/` and `/items/5` → 200 `text/html` (SPA shell, deep link
+  survives); `/assets/<hash>.js` → 200 `text/javascript`; `/api/does-not-exist` → 404 envelope
+  `http_error`; `/api/auth/me` → 401 envelope `unauthenticated`. All correct.
+- **Dockerfile:** added a `frontend-build` stage. Used `node:22-slim` (matches the local toolchain
+  that generated `package-lock.json` and built cleanly here) rather than the plan's `node:26`.
+  The image build itself is deferred to Phase 4 CI (no docker daemon here); the *serving behavior*
+  it produces is already validated above. Added `backend/static/` to `.gitignore` and a
+  `frontend/.prettierignore` (generated `openapi.json`/`schema.d.ts`).
+
+## Phase 2 result
+All tasks complete. **28 frontend tests (Vitest, 16 files) + 100 backend tests** passing;
+`ruff` and ESLint/Prettier clean (4 non-fatal react-refresh warnings on provider+hook files);
+`npm run build` and `npm run typecheck` green. The single-container serving path (API + built
+SPA + client-side-routing fallback) is validated end-to-end locally. Docker image build and
+Playwright e2e remain for Phase 4.
