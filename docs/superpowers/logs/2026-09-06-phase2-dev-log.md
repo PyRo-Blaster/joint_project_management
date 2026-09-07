@@ -33,3 +33,17 @@ deviations, failures, and their resolutions are.
   `CurrentUser`. RED (404) → GREEN. Full backend suite **99 passed** (was 97), `ruff` clean.
 - Executed before the frontend so `openapi.json`/`schema.d.ts` are generated once with
   `UserBrief` already present.
+
+### T1–T2 — scaffold + design system
+- **Deviation (ESLint 9):** the plan's `.eslintrc.cjs` is ignored by ESLint 9 (flat-config
+  default). Replaced with `eslint.config.js` (flat) using the `typescript-eslint` meta-package +
+  `@eslint/js` + `globals`, and `no-undef: off` (TS handles undefineds). `npm run lint` passes.
+- **Fix (jsdom matchMedia):** `theme.test` crashed because jsdom has no `window.matchMedia`;
+  the provider's `system` effect called it. Added a `matchMedia` stub to `test/setup.ts`.
+- **Fix (TS config):** the plan's `tsconfig.node.json` project-reference tripped
+  `composite`/`noEmit` errors, and `@types/node` was missing (vite.config uses `node:path`,
+  `__dirname`). Collapsed to a single `tsconfig.json` (includes `src`, `test`, `vite.config.ts`;
+  `types: [node, vitest/globals, jest-dom]`), added `@types/node`, and switched `build`/`typecheck`
+  to `tsc --noEmit` (no build-mode/composite requirement). Removed `tsconfig.node.json`.
+- Gates: `npm test` 2 passed (App, theme); `npm run build` clean (vite build → dist);
+  `npm run lint` clean (0 errors, 1 harmless react-refresh warning).
