@@ -47,3 +47,21 @@ deviations, failures, and their resolutions are.
   to `tsc --noEmit` (no build-mode/composite requirement). Removed `tsconfig.node.json`.
 - Gates: `npm test` 2 passed (App, theme); `npm run build` clean (vite build → dist);
   `npm run lint` clean (0 errors, 1 harmless react-refresh warning).
+
+### T3 — UI primitives + domain badges
+- No surprises. 6 tests (format, button, StatusBadge + earlier). Prettier reflowed a few
+  cva/interface lines; ran `npm run format` to keep the tree clean.
+
+### T4–T5 — API layer + TanStack Query
+- Generated `openapi.json` from the backend via
+  `SECRET_KEY=… uv run --python 3.13.12 python -c "…create_app().openapi()"` (offline, no server),
+  then `npm run gen:api`. All 9 DTOs (incl. `UserBrief`) present. Client/query tests 5 passed.
+
+### T6–T7 — auth + app shell
+- **Fix (Button `asChild`):** the plan's `<Button asChild={false}><Link/></Button>` doesn't
+  compile — `Button` has no Radix Slot, and `<button><a>` is invalid HTML. Replaced with a
+  `Link` styled by `buttonVariants()` in `NotFound` (and later `ItemDetailPage`).
+- Kept `router.tsx` on placeholders (`ItemsPlaceholder`, no `/items/:id`) so this task builds
+  green; the real pages are wired in T10 and T13.
+- Gates: `npm test` 16 passed (9 files); `npm run build` clean. Bundle ~509 kB (159 kB gzip) —
+  Vite's >500 kB note is informational; code-splitting is a Phase 3/hardening concern.
