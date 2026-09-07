@@ -3,8 +3,10 @@ import { ListChecks } from "lucide-react";
 import { useSearchParams } from "react-router-dom";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
+import { ItemDetailSheet } from "@/features/item-detail/ItemDetailSheet";
 import { ColumnChooser } from "./ColumnChooser";
 import { FilterBar } from "./FilterBar";
+import { NewItemButton } from "./NewItemButton";
 import { filtersToSearchParams, parseFilters, type ItemFilters } from "./filters";
 import { ItemsTable } from "./ItemsTable";
 import { Pagination } from "./Pagination";
@@ -54,6 +56,7 @@ export function ItemsPage() {
 
       <FilterBar filters={filters} onChange={apply}>
         <ColumnChooser columns={columns} visible={visible} onToggle={toggle} />
+        <NewItemButton />
       </FilterBar>
 
       {items.isLoading ? (
@@ -88,6 +91,8 @@ export function ItemsPage() {
           />
         </>
       )}
+
+      <ItemDetailSheet />
     </div>
   );
 }
