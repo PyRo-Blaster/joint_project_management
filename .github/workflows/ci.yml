@@ -1,0 +1,89 @@
+name: ci
+
+on:
+  push:
+    branches: ["**"]
+    tags-ignore: ["**"]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --frozen --python 3.13
+      - name: Lint
+        run: uv run --python 3.13 ruff check app tests
+      - name: Format check
+        run: uv run --python 3.13 ruff format --check app tests
+      - name: Tests + coverage gate (real GS098 sheet absent; synthetic fixture keeps coverage >= 80%)
+        run: uv run --python 3.13 pytest --cov=app --cov-report=term-missing --cov-fail-under=80
+
+  frontend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run build
+
+  postgres-migrations:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: cmc
+          POSTGRES_PASSWORD: cmc
+          POSTGRES_DB: cmc
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U cmc"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      SECRET_KEY: ci-secret-key-0123456789
+      DATABASE_URL: postgresql+psycopg://cmc:cmc@localhost:5432/cmc
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --frozen --python 3.13
+      - name: Migrations apply and revert on PostgreSQL
+        run: |
+          uv run --python 3.13 alembic upgrade head
+          uv run --python 3.13 alembic downgrade base
+
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Container smoke test (data-free)
+        run: bash scripts/smoke-ci.sh
