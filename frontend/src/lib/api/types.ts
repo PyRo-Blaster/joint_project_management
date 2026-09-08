@@ -15,7 +15,11 @@ export type UpdatePatch = S["UpdatePatch"];
 export type AuditEventOut = S["AuditEventOut"];
 export type DashboardSummary = S["DashboardSummary"];
 export type VocabTermOut = S["VocabTermOut"];
+export type ImportPreviewOut = S["ImportPreviewOut"];
+export type ImportCommitOut = S["ImportCommitOut"];
 export type InvitationOut = S["InvitationOut"];
+export type InvitationCreatedOut = S["InvitationCreatedOut"];
+export type ResetLinkOut = S["ResetLinkOut"];
 
 // Envelope — hand-written; the backend wraps every response in this shape.
 export interface Meta {

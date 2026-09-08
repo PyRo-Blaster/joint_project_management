@@ -1,6 +1,6 @@
 services:
   app:
-    image: joint-cmc-tracker:${APP_VERSION:-latest}
+    image: ${IMAGE:-joint-cmc-tracker}:${APP_VERSION:-latest}
     build:
       context: .
     env_file:
@@ -12,5 +12,41 @@ services:
       - ./resources:/import:ro
     restart: unless-stopped
 
+  postgres:
+    image: postgres:17-alpine
+    profiles: ["postgres"]
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-cmc}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-cmc}
+      POSTGRES_DB: ${POSTGRES_DB:-cmc}
+    volumes:
+      - pg-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-cmc}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2-alpine
+    profiles: ["proxy"]
+    environment:
+      # Required when the proxy profile is used; Caddy fails fast at runtime if empty.
+      DOMAIN: ${DOMAIN:-}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - app
+    restart: unless-stopped
+
 volumes:
   app-data:
+  pg-data:
+  caddy-data:
+  caddy-config:

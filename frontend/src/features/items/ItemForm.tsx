@@ -30,12 +30,14 @@ function Field({
   error?: string;
   children: React.ReactNode;
 }) {
+  // Wrap the control in the label so it has an accessible name (getByLabel / e2e) and
+  // clicking the label focuses the control.
   return (
-    <div className="flex flex-col gap-1.5">
-      <Label>{label}</Label>
+    <Label className="flex flex-col gap-1.5 font-medium">
+      <span>{label}</span>
       {children}
-      {error && <p className="text-sm text-danger">{error}</p>}
-    </div>
+      {error && <span className="text-sm font-normal text-danger">{error}</span>}
+    </Label>
   );
 }
 

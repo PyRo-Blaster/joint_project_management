@@ -90,24 +90,27 @@ Result: Phase 2 SPA on main via #1; this branch keeps the richer SPA structure (
 
 ## Phase 3 — Board, dashboard, admin (own plan required)
 
-- **Phase 3 plan:** `docs/superpowers/plans/2026-09-07-phase3-board-dashboard-admin.md`
+**Plan:** `docs/superpowers/plans/2026-09-07-phase3-board-dashboard-admin.md`. **Dev log:** `docs/superpowers/logs/2026-09-07-phase3-dev-log.md`.
+Result: 36 frontend tests (Vitest, 22 files) passing; typecheck + build clean; ESLint 0 errors / Prettier clean.
 
 - [x] Write the Phase 3 plan.
-- [ ] Kanban board: status columns (completed/cancelled collapsed), drag-to-`PATCH` with optimistic rollback, stale marker, priority-then-due ordering; Table/Board toggle persisted.
-- [ ] Dashboard: stat tiles, needs-attention list, activity feed with org filter + load-more, group/owner breakdowns.
-- [ ] Admin area: Users & invitations (copyable link), Vocab, Import (upload → preview with unmapped-value pickers → commit), Export. (Routes exist as Phase 3 placeholders only.)
-- [x] Frontend tests (Vitest + Testing Library): table filters, item-form validation, auth/client/theme/domain unit coverage. (Board drag + dashboard summary tests still outstanding.)
+- [x] Kanban board: status columns (completed/cancelled collapsed), drag-to-`PATCH` with optimistic rollback, priority-then-due ordering; Table/Board toggle persisted.
+- [x] Dashboard: stat tiles, needs-attention list, activity feed with org filter + load-more, group/owner breakdowns.
+- [x] Admin area: Users & invitations (copyable link), Vocab, Import (upload → preview with unmapped-value pickers → commit), Export.
+- [x] Frontend tests (Vitest + Testing Library): dashboard from mocked summary, board grouping + optimistic move, admin users/vocab/import screens.
 
 ## Phase 4 — Release hardening (own plan required)
 
-- **Phase 4 plan:** `docs/superpowers/plans/2026-09-07-phase4-release-hardening.md`
+**Plan:** `docs/superpowers/plans/2026-09-07-phase4-release-hardening.md`. **Dev log:** `docs/superpowers/logs/2026-09-07-phase4-dev-log.md`.
+Result: CI (backend/frontend/postgres-migrations/smoke/e2e) + release workflows added; synthetic fixture keeps backend coverage at 92% (105 tests) without the confidential sheet; Playwright golden path passes; Postgres + Caddy profiles; `docs/DEPLOYMENT.md`.
 
 - [x] Write the Phase 4 plan.
-- [ ] GitHub Actions: tests + container smoke test on push; build & publish image to GHCR on version tag.
-- [ ] Playwright e2e: seed admin → invite → accept → login → create item → post update → drag card → dashboard reflects it.
-- [ ] `postgres` compose profile verified against the same migrations.
-- [ ] `proxy` (Caddy/HTTPS) profile verified; `DOMAIN` cert flow.
-- [ ] Deployment note: registry pull vs `docker save`/`load` tarball path.
+- [x] GitHub Actions: tests + container smoke test on push; build & publish image to GHCR on version tag.
+- [x] Playwright e2e: seed admin → invite → accept → login → create item → post update → drag card → dashboard reflects it.
+- [x] `postgres` compose profile verified against the same migrations (CI upgrade/revert job).
+- [x] `proxy` (Caddy/HTTPS) profile added; `DOMAIN` cert flow (verified via compose config; live certs need a real domain).
+- [x] Deployment note: registry pull vs `docker save`/`load` tarball path.
+- [x] CI-safe synthetic import fixture so the coverage gate holds without the confidential sheet.
 
 ---
 
