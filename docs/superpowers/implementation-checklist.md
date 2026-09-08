@@ -101,14 +101,16 @@ Result: 36 frontend tests (Vitest, 22 files) passing; typecheck + build clean; E
 
 ## Phase 4 — Release hardening (own plan required)
 
-- **Phase 4 plan:** `docs/superpowers/plans/2026-09-07-phase4-release-hardening.md`
+**Plan:** `docs/superpowers/plans/2026-09-07-phase4-release-hardening.md`. **Dev log:** `docs/superpowers/logs/2026-09-07-phase4-dev-log.md`.
+Result: CI (backend/frontend/postgres-migrations/smoke/e2e) + release workflows added; synthetic fixture keeps backend coverage at 92% (105 tests) without the confidential sheet; Playwright golden path passes; Postgres + Caddy profiles; `docs/DEPLOYMENT.md`.
 
 - [x] Write the Phase 4 plan.
-- [ ] GitHub Actions: tests + container smoke test on push; build & publish image to GHCR on version tag.
-- [ ] Playwright e2e: seed admin → invite → accept → login → create item → post update → drag card → dashboard reflects it.
-- [ ] `postgres` compose profile verified against the same migrations.
-- [ ] `proxy` (Caddy/HTTPS) profile verified; `DOMAIN` cert flow.
-- [ ] Deployment note: registry pull vs `docker save`/`load` tarball path.
+- [x] GitHub Actions: tests + container smoke test on push; build & publish image to GHCR on version tag.
+- [x] Playwright e2e: seed admin → invite → accept → login → create item → post update → drag card → dashboard reflects it.
+- [x] `postgres` compose profile verified against the same migrations (CI upgrade/revert job).
+- [x] `proxy` (Caddy/HTTPS) profile added; `DOMAIN` cert flow (verified via compose config; live certs need a real domain).
+- [x] Deployment note: registry pull vs `docker save`/`load` tarball path.
+- [x] CI-safe synthetic import fixture so the coverage gate holds without the confidential sheet.
 
 ---
 
