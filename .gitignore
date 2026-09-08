@@ -18,6 +18,9 @@ frontend/coverage/
 frontend/test-results/
 frontend/playwright-report/
 
+# Built SPA served by the backend in the container (produced by the Docker build)
+backend/static/
+
 # Local data and secrets
 *.db
 *.sqlite

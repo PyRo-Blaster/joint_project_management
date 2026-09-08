@@ -75,7 +75,8 @@ Deliverable: `docker compose up -d` yields an authenticated API with the GS098 s
 
 Deliverable: both teams use it from one container. Add a Node build stage to the Dockerfile and serve `static/`.
 
-- **Phase 2 plan:** `docs/superpowers/plans/2026-09-06-phase2-frontend-core.md`
+**Plan:** `docs/superpowers/plans/2026-09-06-phase2-frontend-core.md`. **Dev log:** `docs/superpowers/logs/2026-09-06-phase2-dev-log.md`.
+Result: Phase 2 SPA on main via #1; this branch keeps the richer SPA structure (theme, Vitest suite, layout) plus `GET /users/directory` and SPAStaticFiles fallback.
 
 - [x] Write the Phase 2 implementation plan (writing-plans skill).
 - [x] Vite + React + TS + Tailwind scaffold; app shell (router, providers, layout).
@@ -85,18 +86,23 @@ Deliverable: both teams use it from one container. Add a Node build stage to the
 - [x] Item detail (side sheet + deep-link route): editable fields, update timeline compose box, History tab with audit diffs.
 - [x] Envelope-aware API layer (TanStack Query, react-hook-form + zod), inline field errors + toasts.
 - [x] Dockerfile Node stage builds frontend into `static/`; single container serves API + UI.
+- [x] Backend enabler: `GET /users/directory` (authenticated) so members can resolve/pick assignees.
 
 ## Phase 3 — Board, dashboard, admin (own plan required)
 
-- [ ] Write the Phase 3 plan.
+- **Phase 3 plan:** `docs/superpowers/plans/2026-09-07-phase3-board-dashboard-admin.md`
+
+- [x] Write the Phase 3 plan.
 - [ ] Kanban board: status columns (completed/cancelled collapsed), drag-to-`PATCH` with optimistic rollback, stale marker, priority-then-due ordering; Table/Board toggle persisted.
 - [ ] Dashboard: stat tiles, needs-attention list, activity feed with org filter + load-more, group/owner breakdowns.
-- [ ] Admin area: Users & invitations (copyable link), Vocab, Import (upload → preview with unmapped-value pickers → commit), Export.
-- [ ] Frontend tests (Vitest + Testing Library): table filters, board drag, item-form validation, dashboard from mocked summary.
+- [ ] Admin area: Users & invitations (copyable link), Vocab, Import (upload → preview with unmapped-value pickers → commit), Export. (Routes exist as Phase 3 placeholders only.)
+- [x] Frontend tests (Vitest + Testing Library): table filters, item-form validation, auth/client/theme/domain unit coverage. (Board drag + dashboard summary tests still outstanding.)
 
 ## Phase 4 — Release hardening (own plan required)
 
-- [ ] Write the Phase 4 plan.
+- **Phase 4 plan:** `docs/superpowers/plans/2026-09-07-phase4-release-hardening.md`
+
+- [x] Write the Phase 4 plan.
 - [ ] GitHub Actions: tests + container smoke test on push; build & publish image to GHCR on version tag.
 - [ ] Playwright e2e: seed admin → invite → accept → login → create item → post update → drag card → dashboard reflects it.
 - [ ] `postgres` compose profile verified against the same migrations.

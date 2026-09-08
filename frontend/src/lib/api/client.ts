@@ -1,117 +1,95 @@
-import { CSRF_HEADER, CSRF_VALUE, SESSION_EXPIRED_EVENT } from "@/lib/constants";
-import type { Envelope, Meta } from "@/lib/api/types";
+import type { Envelope, ErrorBody, Meta } from "./types";
 
+export const AUTH_EXPIRED_EVENT = "cmc:auth-expired";
+const BASE = "/api";
+
+/** Typed error carrying the backend envelope's error body plus the HTTP status. */
 export class ApiError extends Error {
-  code: string;
-  fields: Record<string, string> | null;
-  requestId: string | null;
-  status: number;
+  readonly code: string;
+  readonly status: number;
+  readonly fields?: Record<string, string> | null;
+  readonly requestId?: string | null;
 
-  constructor(
-    message: string,
-    opts: {
-      code: string;
-      fields?: Record<string, string> | null;
-      requestId?: string | null;
-      status: number;
-    },
-  ) {
-    super(message);
+  constructor(status: number, error: ErrorBody) {
+    super(error.message);
     this.name = "ApiError";
-    this.code = opts.code;
-    this.fields = opts.fields ?? null;
-    this.requestId = opts.requestId ?? null;
-    this.status = opts.status;
+    this.code = error.code;
+    this.status = status;
+    this.fields = error.fields;
+    this.requestId = error.request_id;
   }
 }
 
-export type ApiResult<T> = { data: T; meta: Meta | null };
-
-type RequestOptions = {
-  method?: string;
+export interface ApiOptions {
+  method?: "GET" | "POST" | "PATCH" | "DELETE" | "PUT";
   body?: unknown;
-  query?: Record<string, string | number | boolean | undefined | null | Array<string | number>>;
+  /** Query params; arrays become repeated keys (matches FastAPI list query params). */
+  params?: Record<string, string | number | boolean | Array<string | number> | null | undefined>;
   signal?: AbortSignal;
-};
+}
 
-function buildQuery(
-  query?: RequestOptions["query"],
-): string {
-  if (!query) return "";
-  const params = new URLSearchParams();
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined || value === null || value === "") continue;
-    if (Array.isArray(value)) {
-      for (const item of value) params.append(key, String(item));
-    } else {
-      params.append(key, String(value));
+function buildUrl(path: string, params?: ApiOptions["params"]): string {
+  const url = new URL(`${BASE}${path}`, window.location.origin);
+  if (params) {
+    for (const [key, value] of Object.entries(params)) {
+      if (value === null || value === undefined || value === "") continue;
+      if (Array.isArray(value)) value.forEach((v) => url.searchParams.append(key, String(v)));
+      else url.searchParams.set(key, String(value));
     }
   }
-  const qs = params.toString();
-  return qs ? `?${qs}` : "";
+  return url.pathname + url.search;
 }
 
-async function request<T>(path: string, options: RequestOptions = {}): Promise<ApiResult<T>> {
-  const method = (options.method ?? "GET").toUpperCase();
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-  };
-  if (method !== "GET" && method !== "HEAD") {
-    headers[CSRF_HEADER] = CSRF_VALUE;
-  }
-  let body: BodyInit | undefined;
-  if (options.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-    body = JSON.stringify(options.body);
-  }
+async function request<T>(path: string, options: ApiOptions): Promise<Envelope<T>> {
+  const { method = "GET", body, params, signal } = options;
+  const headers: Record<string, string> = { "X-Requested-With": "fetch" };
+  if (body !== undefined) headers["Content-Type"] = "application/json";
 
-  const response = await fetch(`/api${path}${buildQuery(options.query)}`, {
+  const response = await fetch(buildUrl(path, params), {
     method,
     headers,
-    body,
-    credentials: "include",
-    signal: options.signal,
+    credentials: "same-origin",
+    body: body !== undefined ? JSON.stringify(body) : undefined,
+    signal,
   });
 
-  let envelope: Envelope<T> | null = null;
-  const text = await response.text();
-  if (text) {
-    try {
-      envelope = JSON.parse(text) as Envelope<T>;
-    } catch {
-      envelope = null;
-    }
-  }
-
   if (response.status === 401) {
-    window.dispatchEvent(new CustomEvent(SESSION_EXPIRED_EVENT));
+    window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
   }
 
-  if (!envelope) {
-    throw new ApiError(text || response.statusText || "Request failed", {
-      code: "http_error",
-      status: response.status,
+  let envelope: Envelope<T>;
+  try {
+    envelope = (await response.json()) as Envelope<T>;
+  } catch {
+    throw new ApiError(response.status, {
+      code: "network_error",
+      message: "The server returned an unreadable response.",
     });
   }
 
   if (!response.ok || !envelope.success) {
-    const err = envelope.error;
-    throw new ApiError(err?.message ?? "Request failed", {
-      code: err?.code ?? "http_error",
-      fields: err?.fields ?? null,
-      requestId: err?.request_id ?? null,
-      status: response.status,
-    });
+    throw new ApiError(
+      response.status,
+      envelope.error ?? { code: "error", message: "Request failed" },
+    );
   }
-
-  return { data: envelope.data as T, meta: envelope.meta };
+  return envelope;
 }
 
-export const api = {
-  get: <T>(path: string, query?: RequestOptions["query"], signal?: AbortSignal) =>
-    request<T>(path, { method: "GET", query, signal }),
-  post: <T>(path: string, body?: unknown, query?: RequestOptions["query"]) =>
-    request<T>(path, { method: "POST", body, query }),
-  patch: <T>(path: string, body?: unknown) => request<T>(path, { method: "PATCH", body }),
-  delete: <T>(path: string) => request<T>(path, { method: "DELETE" }),
-};
+/** Unwraps `data`. Use for single-object and action endpoints. */
+export async function apiFetch<T>(path: string, options: ApiOptions = {}): Promise<T> {
+  const envelope = await request<T>(path, options);
+  return envelope.data as T;
+}
+
+/** Returns `{ data, meta }` for list endpoints that page. */
+export async function apiList<T>(
+  path: string,
+  options: ApiOptions = {},
+): Promise<{ data: T[]; meta: Meta }> {
+  const envelope = await request<T[]>(path, options);
+  return {
+    data: (envelope.data ?? []) as T[],
+    meta: envelope.meta ?? { total: 0, page: 1, limit: 0 },
+  };
+}
