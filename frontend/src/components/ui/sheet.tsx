@@ -1,59 +1,45 @@
-import { useEffect, type ReactNode } from "react";
+import * as DialogPrimitive from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { Button } from "@/components/ui/button";
+import { forwardRef } from "react";
+import { cn } from "@/lib/cn";
 
-export function Sheet({
-  open,
-  onClose,
-  title,
-  children,
-  wide,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title?: ReactNode;
-  children: ReactNode;
-  wide?: boolean;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
-    window.addEventListener("keydown", onKey);
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = "hidden";
-    return () => {
-      window.removeEventListener("keydown", onKey);
-      document.body.style.overflow = prev;
-    };
-  }, [open, onClose]);
+export const Sheet = DialogPrimitive.Root;
+export const SheetTrigger = DialogPrimitive.Trigger;
+export const SheetClose = DialogPrimitive.Close;
 
-  if (!open) return null;
+export const SheetContent = forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Content>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content> & { widthClass?: string }
+>(({ className, children, widthClass = "w-full max-w-xl", ...props }, ref) => (
+  <DialogPrimitive.Portal>
+    <DialogPrimitive.Overlay className="fixed inset-0 z-40 bg-black/40" />
+    <DialogPrimitive.Content
+      ref={ref}
+      className={cn(
+        "fixed inset-y-0 right-0 z-50 flex flex-col border-l border-border bg-surface shadow-md transition-transform data-[state=closed]:translate-x-full",
+        widthClass,
+        className,
+      )}
+      {...props}
+    >
+      {children}
+      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-md p-1 text-fg-muted hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+        <X className="size-4" />
+        <span className="sr-only">Close</span>
+      </DialogPrimitive.Close>
+    </DialogPrimitive.Content>
+  </DialogPrimitive.Portal>
+));
+SheetContent.displayName = "SheetContent";
 
-  return (
-    <div className="fixed inset-0 z-40 flex justify-end">
-      <button
-        type="button"
-        aria-label="Close detail"
-        className="absolute inset-0 bg-slate-900/40 backdrop-blur-[1px]"
-        onClick={onClose}
-      />
-      <aside
-        className={cn(
-          "relative z-10 flex h-full w-full flex-col bg-surface-raised shadow-sheet",
-          wide ? "max-w-2xl" : "max-w-xl",
-        )}
-      >
-        <header className="flex items-center justify-between gap-3 border-b border-line px-5 py-4">
-          <div className="min-w-0 text-lg font-semibold tracking-tight">{title}</div>
-          <Button variant="ghost" size="sm" onClick={onClose} aria-label="Close">
-            <X className="h-4 w-4" />
-          </Button>
-        </header>
-        <div className="flex-1 overflow-y-auto px-5 py-4">{children}</div>
-      </aside>
-    </div>
-  );
+export function SheetHeader({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+  return <div className={cn("border-b border-border px-6 py-4", className)} {...props} />;
 }
+export const SheetTitle = forwardRef<
+  React.ElementRef<typeof DialogPrimitive.Title>,
+  React.ComponentPropsWithoutRef<typeof DialogPrimitive.Title>
+>(({ className, ...props }, ref) => (
+  <DialogPrimitive.Title ref={ref} className={cn("text-lg font-semibold", className)} {...props} />
+));
+SheetTitle.displayName = "SheetTitle";
+export const SheetDescription = DialogPrimitive.Description;

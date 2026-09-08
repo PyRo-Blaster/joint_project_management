@@ -18,6 +18,15 @@ class UserOut(BaseModel):
     created_at: datetime
 
 
+class UserBrief(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    name: str
+    org: str
+    is_active: bool
+
+
 class UserPatch(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=200)
     org: Org | None = None
