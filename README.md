@@ -35,6 +35,10 @@ docker compose build && docker save joint-cmc-tracker:latest | gzip > joint-cmc-
 
 End-to-end smoke test (needs Docker running): `scripts/smoke.sh`
 
+Full deployment guide (GHCR pull vs offline tarball, PostgreSQL and HTTPS profiles,
+backup/restore, release): `docs/DEPLOYMENT.md`. PostgreSQL: `docker compose --profile
+postgres up -d`. HTTPS via Caddy: `docker compose --profile proxy up -d` (set `DOMAIN`).
+
 ## Develop locally
 
 ```bash

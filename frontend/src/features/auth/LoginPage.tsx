@@ -22,7 +22,7 @@ export function LoginPage() {
     try {
       await login.mutateAsync(values);
       const params = new URLSearchParams(window.location.search);
-      navigate(params.get("returnTo") || "/items", { replace: true });
+      navigate(params.get("returnTo") || "/dashboard", { replace: true });
     } catch (error) {
       if (error instanceof ApiError && error.status === 429) {
         setError("root", { message: "Too many attempts. Wait a minute and try again." });

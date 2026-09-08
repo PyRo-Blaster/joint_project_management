@@ -3,14 +3,17 @@ import { AcceptInvitePage } from "@/features/auth/AcceptInvitePage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ItemsPage } from "@/features/items/ItemsPage";
 import { ItemDetailPage } from "@/features/item-detail/ItemDetailPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { BoardPage } from "@/features/board/BoardPage";
+import { AdminLayout } from "@/features/admin/AdminLayout";
+import { UsersPage } from "@/features/admin/users/UsersPage";
+import { VocabPage } from "@/features/admin/vocab/VocabPage";
+import { ImportPage } from "@/features/admin/import/ImportPage";
+import { ExportPage } from "@/features/admin/export/ExportPage";
+import { AdminRoute } from "./AdminRoute";
 import { AppLayout } from "./layout/AppLayout";
 import { NotFound } from "./NotFound";
 import { ProtectedRoute } from "./ProtectedRoute";
-
-// Phase 3 screens (dashboard, board, admin) land later.
-function ComingSoon({ title }: { title: string }) {
-  return <p className="text-fg-muted">{title} arrives in Phase 3.</p>;
-}
 
 export function AppRoutes() {
   return (
@@ -19,12 +22,20 @@ export function AppRoutes() {
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate to="/items" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
-          <Route path="/dashboard" element={<ComingSoon title="Dashboard" />} />
-          <Route path="/board" element={<ComingSoon title="Board" />} />
-          <Route path="/admin" element={<ComingSoon title="Admin" />} />
+          <Route path="/board" element={<BoardPage />} />
+          <Route path="/admin" element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/users" replace />} />
+              <Route path="users" element={<UsersPage />} />
+              <Route path="vocab" element={<VocabPage />} />
+              <Route path="import" element={<ImportPage />} />
+              <Route path="export" element={<ExportPage />} />
+            </Route>
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<NotFound />} />

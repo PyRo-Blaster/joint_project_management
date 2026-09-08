@@ -5,8 +5,10 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ItemDetailSheet } from "@/features/item-detail/ItemDetailSheet";
 import { ColumnChooser } from "./ColumnChooser";
+import { ExportButton } from "./ExportButton";
 import { FilterBar } from "./FilterBar";
 import { NewItemButton } from "./NewItemButton";
+import { ViewToggle } from "./ViewToggle";
 import { filtersToSearchParams, parseFilters, type ItemFilters } from "./filters";
 import { ItemsTable } from "./ItemsTable";
 import { Pagination } from "./Pagination";
@@ -47,15 +49,19 @@ export function ItemsPage() {
 
   return (
     <div className="flex flex-col gap-4">
-      <div>
-        <h1 className="text-xl font-semibold">Action items</h1>
-        <p className="text-sm text-fg-muted">
-          {total} item{total === 1 ? "" : "s"}
-        </p>
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-xl font-semibold">Action items</h1>
+          <p className="text-sm text-fg-muted">
+            {total} item{total === 1 ? "" : "s"}
+          </p>
+        </div>
+        <ViewToggle />
       </div>
 
       <FilterBar filters={filters} onChange={apply}>
         <ColumnChooser columns={columns} visible={visible} onToggle={toggle} />
+        <ExportButton filters={filters} />
         <NewItemButton />
       </FilterBar>
 

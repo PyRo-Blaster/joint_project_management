@@ -93,3 +93,30 @@ export async function apiList<T>(
     meta: envelope.meta ?? { total: 0, page: 1, limit: 0 },
   };
 }
+
+/** POST multipart form data (file uploads). Lets the browser set the multipart boundary. */
+export async function apiUpload<T>(path: string, formData: FormData): Promise<T> {
+  const response = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: { "X-Requested-With": "fetch" },
+    credentials: "same-origin",
+    body: formData,
+  });
+  if (response.status === 401) window.dispatchEvent(new CustomEvent(AUTH_EXPIRED_EVENT));
+  let envelope: Envelope<T>;
+  try {
+    envelope = (await response.json()) as Envelope<T>;
+  } catch {
+    throw new ApiError(response.status, {
+      code: "network_error",
+      message: "The server returned an unreadable response.",
+    });
+  }
+  if (!response.ok || !envelope.success) {
+    throw new ApiError(
+      response.status,
+      envelope.error ?? { code: "error", message: "Request failed" },
+    );
+  }
+  return envelope.data as T;
+}
