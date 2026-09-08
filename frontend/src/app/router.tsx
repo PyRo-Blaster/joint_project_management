@@ -3,6 +3,7 @@ import { AcceptInvitePage } from "@/features/auth/AcceptInvitePage";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { ItemsPage } from "@/features/items/ItemsPage";
 import { ItemDetailPage } from "@/features/item-detail/ItemDetailPage";
+import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { AppLayout } from "./layout/AppLayout";
 import { NotFound } from "./NotFound";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -19,10 +20,10 @@ export function AppRoutes() {
       <Route path="/accept-invite" element={<AcceptInvitePage />} />
       <Route element={<ProtectedRoute />}>
         <Route element={<AppLayout />}>
-          <Route index element={<Navigate to="/items" replace />} />
+          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
-          <Route path="/dashboard" element={<ComingSoon title="Dashboard" />} />
           <Route path="/board" element={<ComingSoon title="Board" />} />
           <Route path="/admin" element={<ComingSoon title="Admin" />} />
         </Route>
