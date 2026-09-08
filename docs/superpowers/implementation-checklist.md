@@ -90,13 +90,14 @@ Result: Phase 2 SPA on main via #1; this branch keeps the richer SPA structure (
 
 ## Phase 3 — Board, dashboard, admin (own plan required)
 
-- **Phase 3 plan:** `docs/superpowers/plans/2026-09-07-phase3-board-dashboard-admin.md`
+**Plan:** `docs/superpowers/plans/2026-09-07-phase3-board-dashboard-admin.md`. **Dev log:** `docs/superpowers/logs/2026-09-07-phase3-dev-log.md`.
+Result: 36 frontend tests (Vitest, 22 files) passing; typecheck + build clean; ESLint 0 errors / Prettier clean.
 
 - [x] Write the Phase 3 plan.
-- [ ] Kanban board: status columns (completed/cancelled collapsed), drag-to-`PATCH` with optimistic rollback, stale marker, priority-then-due ordering; Table/Board toggle persisted.
-- [ ] Dashboard: stat tiles, needs-attention list, activity feed with org filter + load-more, group/owner breakdowns.
-- [ ] Admin area: Users & invitations (copyable link), Vocab, Import (upload → preview with unmapped-value pickers → commit), Export. (Routes exist as Phase 3 placeholders only.)
-- [x] Frontend tests (Vitest + Testing Library): table filters, item-form validation, auth/client/theme/domain unit coverage. (Board drag + dashboard summary tests still outstanding.)
+- [x] Kanban board: status columns (completed/cancelled collapsed), drag-to-`PATCH` with optimistic rollback, priority-then-due ordering; Table/Board toggle persisted.
+- [x] Dashboard: stat tiles, needs-attention list, activity feed with org filter + load-more, group/owner breakdowns.
+- [x] Admin area: Users & invitations (copyable link), Vocab, Import (upload → preview with unmapped-value pickers → commit), Export.
+- [x] Frontend tests (Vitest + Testing Library): dashboard from mocked summary, board grouping + optimistic move, admin users/vocab/import screens.
 
 ## Phase 4 — Release hardening (own plan required)
 
