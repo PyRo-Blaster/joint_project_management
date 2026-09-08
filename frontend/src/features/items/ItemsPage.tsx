@@ -5,6 +5,7 @@ import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ItemDetailSheet } from "@/features/item-detail/ItemDetailSheet";
 import { ColumnChooser } from "./ColumnChooser";
+import { ExportButton } from "./ExportButton";
 import { FilterBar } from "./FilterBar";
 import { NewItemButton } from "./NewItemButton";
 import { ViewToggle } from "./ViewToggle";
@@ -60,6 +61,7 @@ export function ItemsPage() {
 
       <FilterBar filters={filters} onChange={apply}>
         <ColumnChooser columns={columns} visible={visible} onToggle={toggle} />
+        <ExportButton filters={filters} />
         <NewItemButton />
       </FilterBar>
 
