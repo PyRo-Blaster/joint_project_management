@@ -4,6 +4,7 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { ItemsPage } from "@/features/items/ItemsPage";
 import { ItemDetailPage } from "@/features/item-detail/ItemDetailPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { BoardPage } from "@/features/board/BoardPage";
 import { AppLayout } from "./layout/AppLayout";
 import { NotFound } from "./NotFound";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -24,7 +25,7 @@ export function AppRoutes() {
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
-          <Route path="/board" element={<ComingSoon title="Board" />} />
+          <Route path="/board" element={<BoardPage />} />
           <Route path="/admin" element={<ComingSoon title="Admin" />} />
         </Route>
       </Route>
