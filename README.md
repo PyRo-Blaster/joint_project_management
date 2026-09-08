@@ -89,3 +89,46 @@ uv run python -m app.cli export-excel out.xlsx
 - Mutating requests must send `X-Requested-With: fetch`.
 - Authentication is a session cookie set by `POST /api/auth/login`.
 - OpenAPI: `/api/docs`.
+
+## Frontend
+
+The UI is a Vite + React + TypeScript + Tailwind app under `frontend/`, built into
+`/app/static` by the Docker image Node stage and served by FastAPI.
+
+### Develop with hot reload
+
+```bash
+# terminal 1 — API
+cd backend
+uv sync
+uv run uvicorn app.main:app --reload --port 8000
+
+# terminal 2 — UI (proxies /api to :8000)
+cd frontend
+# install deps, then run the dev script (see package.json)
+```
+
+Open http://localhost:5173.
+
+### Regenerate the OpenAPI TypeScript types
+
+With the API running (or a saved OpenAPI file):
+
+```bash
+cd frontend
+# default: fetch http://127.0.0.1:8000/api/openapi.json
+# or: OPENAPI_FILE=/path/to/openapi.json
+# then run the generate:api script
+```
+
+Output: `frontend/src/lib/api/schema.d.ts`. Hand-written DTOs used by the app live in
+`frontend/src/lib/api/types.ts`; keep them aligned when the backend schemas change.
+
+### Production build (local check)
+
+```bash
+cd frontend
+# install, typecheck, build → frontend/dist/
+```
+
+`docker compose up -d --build` copies that build into the image as `/app/static`.
