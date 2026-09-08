@@ -26,7 +26,8 @@ export const qk = {
     history: (id: number) => ["items", id, "history"] as const,
   },
   vocab: { list: () => ["vocab"] as const },
-  users: { list: () => ["users"] as const },
+  users: { list: () => ["users"] as const, admin: () => ["users", "admin"] as const },
+  invitations: { list: () => ["invitations"] as const },
   dashboard: { summary: () => ["dashboard", "summary"] as const },
   activity: { list: (filters: unknown) => ["activity", filters] as const },
 };

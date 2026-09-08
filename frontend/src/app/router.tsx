@@ -5,14 +5,12 @@ import { ItemsPage } from "@/features/items/ItemsPage";
 import { ItemDetailPage } from "@/features/item-detail/ItemDetailPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { BoardPage } from "@/features/board/BoardPage";
+import { AdminLayout } from "@/features/admin/AdminLayout";
+import { UsersPage } from "@/features/admin/users/UsersPage";
+import { AdminRoute } from "./AdminRoute";
 import { AppLayout } from "./layout/AppLayout";
 import { NotFound } from "./NotFound";
 import { ProtectedRoute } from "./ProtectedRoute";
-
-// Phase 3 screens (dashboard, board, admin) land later.
-function ComingSoon({ title }: { title: string }) {
-  return <p className="text-fg-muted">{title} arrives in Phase 3.</p>;
-}
 
 export function AppRoutes() {
   return (
@@ -26,7 +24,13 @@ export function AppRoutes() {
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
           <Route path="/board" element={<BoardPage />} />
-          <Route path="/admin" element={<ComingSoon title="Admin" />} />
+          <Route path="/admin" element={<AdminRoute />}>
+            <Route element={<AdminLayout />}>
+              <Route index element={<Navigate to="/admin/users" replace />} />
+              <Route path="users" element={<UsersPage />} />
+              {/* vocab, import, export routes added in later tasks */}
+            </Route>
+          </Route>
         </Route>
       </Route>
       <Route path="*" element={<NotFound />} />
