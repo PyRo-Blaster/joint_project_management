@@ -7,6 +7,7 @@ import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { BoardPage } from "@/features/board/BoardPage";
 import { AdminLayout } from "@/features/admin/AdminLayout";
 import { UsersPage } from "@/features/admin/users/UsersPage";
+import { VocabPage } from "@/features/admin/vocab/VocabPage";
 import { AdminRoute } from "./AdminRoute";
 import { AppLayout } from "./layout/AppLayout";
 import { NotFound } from "./NotFound";
@@ -28,7 +29,8 @@ export function AppRoutes() {
             <Route element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/users" replace />} />
               <Route path="users" element={<UsersPage />} />
-              {/* vocab, import, export routes added in later tasks */}
+              <Route path="vocab" element={<VocabPage />} />
+              {/* import, export routes added in the next task */}
             </Route>
           </Route>
         </Route>
