@@ -97,6 +97,44 @@ def test_action_item_cannot_lose_its_status(member_client, vocab):
     assert response.status_code == 422
 
 
+def test_toggle_action_to_note_clears_status(member_client, vocab):
+    # Regression for issue #4: switching an existing action to a note (the edit
+    # form sends kind="note" with status=null) must save, not 422.
+    item = _create(member_client)
+    member_client.patch(f"/api/items/{item['id']}", json={"status": "completed"})
+
+    response = member_client.patch(
+        f"/api/items/{item['id']}", json={"kind": "note", "status": None}
+    )
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    assert data["kind"] == "note"
+    assert data["status"] is None
+    assert data["completed_on"] is None
+
+    history = member_client.get(f"/api/items/{item['id']}/history").json()["data"]
+    assert history[0]["action"] == "updated"
+    assert history[0]["changes"]["kind"] == {"old": "action", "new": "note"}
+
+
+def test_toggle_note_to_action_takes_given_status(member_client, vocab):
+    note = _create(member_client, kind="note", priority=None)
+    response = member_client.patch(
+        f"/api/items/{note['id']}", json={"kind": "action", "status": "in_progress"}
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["data"]["status"] == "in_progress"
+
+
+def test_toggle_note_to_action_defaults_status_to_open(member_client, vocab):
+    note = _create(member_client, kind="note", priority=None)
+    response = member_client.patch(f"/api/items/{note['id']}", json={"kind": "action"})
+    assert response.status_code == 200, response.text
+    data = response.json()["data"]
+    assert data["kind"] == "action"
+    assert data["status"] == "open"
+
+
 def test_patch_without_changes_records_nothing(member_client, vocab):
     item = _create(member_client)
     member_client.patch(f"/api/items/{item['id']}", json={"title": ITEM["title"]})

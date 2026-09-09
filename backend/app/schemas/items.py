@@ -23,6 +23,7 @@ class ItemCreate(BaseModel):
 
 
 class ItemPatch(BaseModel):
+    kind: Kind | None = None
     title: str | None = Field(default=None, min_length=1, max_length=TITLE_MAX_LENGTH)
     details: str | None = None
     group: str | None = Field(default=None, min_length=1, max_length=200)
