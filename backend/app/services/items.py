@@ -15,6 +15,7 @@ from app.services.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.vocab import active_values
 
 SNAPSHOT_FIELDS = (
+    "kind",
     "title",
     "details",
     "group",
@@ -171,6 +172,28 @@ def _validate_status_for_kind(kind: str, status: str | None) -> None:
         raise InvalidInputError(fields={"status": "action items must have a status"})
 
 
+def _resolve_kind_and_status(item: ActionItem, data: dict) -> None:
+    """Enforce the kind↔status invariant for a patch, mutating ``data`` in place.
+
+    Kind is editable. A note never has a status; an action always does. When the
+    patch changes the kind, the status is coerced to match — cleared for a note,
+    defaulted to ``"open"`` for an action that lacks one (as ``create_item``
+    does) — so toggling an item between action and note just works. When the
+    patch leaves the kind untouched, the status is validated against the item's
+    existing kind, so an action still cannot have its status nulled out.
+    """
+    if "kind" in data:
+        new_kind = data["kind"]
+        if new_kind == "note":
+            status = None
+        else:
+            status = data.get("status", item.status) or "open"
+        _validate_status_for_kind(new_kind, status)
+        data["status"] = status
+    elif "status" in data:
+        _validate_status_for_kind(item.kind, data["status"])
+
+
 def create_item(
     db: Session, *, actor: User, program: Program, data: ItemCreate, today: date | None = None
 ) -> ActionItem:
@@ -233,10 +256,9 @@ def patch_item(
     if item.deleted_at is not None:
         raise ConflictError("Item is deleted; restore it first")
     data = patch.model_dump(exclude_unset=True)
-    if "status" in data:
-        _validate_status_for_kind(item.kind, data["status"])
     _validate_vocab(db, item.program_id, data)
     _validate_assignee(db, data)
+    _resolve_kind_and_status(item, data)
     before = snapshot(item)
     for name, value in data.items():
         setattr(item, name, value.strip() if name == "title" else value)
@@ -247,7 +269,9 @@ def patch_item(
         return item
     item.updated_by = actor.id
     item.updated_at = utcnow()
-    is_status_change = "status" in changes
+    # A kind change also flips the status (an action↔note toggle), so describe it
+    # as a general update rather than a bare "status changed … to None".
+    is_status_change = "status" in changes and "kind" not in changes
     record_event(
         db,
         actor=actor,

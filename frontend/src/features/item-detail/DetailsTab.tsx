@@ -9,7 +9,9 @@ export function DetailsTab({ item }: { item: ItemOut }) {
   const { toast } = useToast();
   return (
     <ItemForm
-      // `kind` is included in the payload but ignored by the PATCH endpoint (kind is immutable).
+      // Switching kind here toggles the item between action and note; the PATCH
+      // endpoint coerces the status to match (cleared for a note, defaulted for
+      // an action).
       defaultValues={itemToFormValues(item)}
       submitLabel="Save changes"
       onSubmit={async (payload) => {
