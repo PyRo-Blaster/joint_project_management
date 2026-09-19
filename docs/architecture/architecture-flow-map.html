@@ -79,12 +79,12 @@
   <header>
     <div class="eyebrow">Joint CMC Tracker · GS098 · v1 as shipped, V2.0 attachment points</div>
     <h1>CMC Tracker Flow Map</h1>
-    <p class="lead">Five drawings of how the program is put together and how a request moves through it: deployment, code layers, the audited write path, the Excel pipeline, and the data model. Amber dashed marks show where the V2.0 work attaches.</p>
+    <p class="lead">Six drawings of how the program is put together and how a request moves through it: deployment, code layers, the audited write path, the Excel pipeline, the data model, and the proposed agent path. Amber dashed marks show where work not yet built attaches.</p>
     <div class="legend">
       <span><i class="swatch"></i> v1 component</span>
       <span><i class="swatch accent"></i> the piece the flow hinges on</span>
       <span><i class="swatch opt"></i> optional (compose profile)</span>
-      <span><i class="swatch v2"></i> V2.0 addition</span>
+      <span><i class="swatch v2"></i> proposed (V2.0 / V2.1)</span>
     </div>
   </header>
 
@@ -550,6 +550,94 @@
         </g>
       </svg>
       <figcaption>Everything hangs off the program, so a second program is a data change rather than a schema change. The audit event is deliberately not foreign-keyed to its entity: it must survive whatever happens to the row it describes. All V2.0 columns are nullable additions in migration 0002.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>6. Agent access via MCP (V2.1 proposal)</h2>
+    <figure>
+      <svg viewBox="0 0 960 330" role="img" aria-label="An agent client connects to a streamable HTTP MCP endpoint mounted at /mcp in the same container, authenticating with a bearer API token that resolves to a real user and a scope. The MCP tool layer sits beside the REST routers and calls the same service layer, so the write lands in one transaction with an audit event tagged as coming from an agent.">
+        <defs>
+          <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <!-- clients -->
+          <rect x="20" y="40" width="170" height="76" rx="4" fill="var(--surface)"/>
+          <text x="105" y="62" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Agent client</text>
+          <text x="105" y="80" text-anchor="middle" fill="var(--muted)" stroke="none">Claude Code · claude.ai</text>
+          <text x="105" y="96" text-anchor="middle" fill="var(--muted)" stroke="none">Claude Desktop</text>
+          <text x="105" y="111" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">stdio only → mcp-remote bridge</text>
+
+          <rect x="20" y="150" width="170" height="70" rx="4" fill="var(--surface)"/>
+          <text x="105" y="172" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Browser (unchanged)</text>
+          <text x="105" y="190" text-anchor="middle" fill="var(--muted)" stroke="none">React SPA</text>
+          <text x="105" y="206" text-anchor="middle" fill="var(--muted)" stroke="none">session cookie</text>
+
+          <!-- container -->
+          <rect x="300" y="24" width="470" height="272" rx="6" stroke="var(--line)" fill="none"/>
+          <text x="312" y="44" fill="var(--muted)" stroke="none" font-size="11">same app container · same image · no new port</text>
+
+          <!-- mcp adapter -->
+          <rect x="320" y="56" width="200" height="86" rx="4" stroke="var(--v2)" stroke-dasharray="5 4" fill="var(--v2-soft)"/>
+          <text x="420" y="78" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">app/mcp/  →  /mcp</text>
+          <text x="420" y="96" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">streamable HTTP · FastMCP</text>
+          <text x="420" y="112" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">14 tools · dry_run · scopes</text>
+          <text x="420" y="128" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">errors name the valid values</text>
+
+          <!-- api routers -->
+          <rect x="320" y="158" width="200" height="62" rx="4" fill="var(--surface)"/>
+          <text x="420" y="180" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">app/api/  →  /api/*</text>
+          <text x="420" y="198" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">routers · CSRF header</text>
+          <text x="420" y="213" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">envelope responses</text>
+
+          <!-- principal -->
+          <rect x="320" y="236" width="200" height="46" rx="4" stroke="var(--v2)" stroke-dasharray="5 4" fill="var(--v2-soft)"/>
+          <text x="420" y="256" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">get_current_principal</text>
+          <text x="420" y="273" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">token or cookie → (user, via, scope)</text>
+
+          <!-- services -->
+          <rect x="560" y="96" width="190" height="96" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="655" y="118" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">app/services/</text>
+          <text x="655" y="136" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">the only DB writers</text>
+          <text x="655" y="152" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">validation · permissions</text>
+          <text x="655" y="168" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">audit event in the</text>
+          <text x="655" y="183" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">same transaction</text>
+
+          <rect x="560" y="216" width="190" height="66" rx="4" fill="var(--surface)"/>
+          <text x="655" y="238" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">audit_event</text>
+          <text x="655" y="256" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">actor_id · changes · summary</text>
+          <rect x="572" y="262" width="166" height="16" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="655" y="274" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="10">+ via · token_name</text>
+
+          <!-- token store -->
+          <rect x="800" y="56" width="140" height="86" rx="4" stroke="var(--v2)" stroke-dasharray="5 4" fill="var(--v2-soft)"/>
+          <text x="870" y="78" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">api_token</text>
+          <text x="870" y="96" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">hashed · prefix shown</text>
+          <text x="870" y="112" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">scopes read|write</text>
+          <text x="870" y="128" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">expiry · revoke</text>
+
+          <!-- arrows -->
+          <line x1="190" y1="88" x2="318" y2="88" marker-end="url(#a6)" stroke="var(--v2)"/>
+          <text x="254" y="80" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">Bearer cmct_…</text>
+          <line x1="190" y1="186" x2="318" y2="186" marker-end="url(#a6)"/>
+          <text x="254" y="178" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">cookie</text>
+          <polyline points="420,142 420,150" marker-end="url(#a6)" stroke-dasharray="3 3"/>
+          <polyline points="420,220 420,234" marker-end="url(#a6)" stroke-dasharray="3 3"/>
+          <line x1="520" y1="99" x2="558" y2="120" marker-end="url(#a6)" stroke="var(--accent)" stroke-width="1.6"/>
+          <line x1="520" y1="189" x2="558" y2="168" marker-end="url(#a6)" stroke="var(--accent)" stroke-width="1.6"/>
+          <line x1="520" y1="259" x2="558" y2="248" marker-end="url(#a6)" stroke-dasharray="3 3"/>
+          <polyline points="798,72 778,72 778,40 544,40 544,66 526,66" marker-end="url(#a6)" stroke="var(--v2)" stroke-dasharray="4 3"/>
+          <text x="700" y="34" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">resolve · scope check · rate limit</text>
+          <line x1="655" y1="192" x2="655" y2="214" marker-end="url(#a6)"/>
+          <text x="880" y="180" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">No MCP tool for</text>
+          <text x="880" y="196" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">delete · restore</text>
+          <text x="880" y="212" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">users · vocab · import</text>
+          <text x="880" y="228" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">— web UI only</text>
+        </g>
+      </svg>
+      <figcaption>The agent path is the same mechanism as figure 3 entered through a different door. The MCP tool layer is a sibling of the REST routers, not a layer above them, so an agent write gets the identical validation, permission check and audit row a person's write gets. Two additions make it accountable: a bearer token that resolves to a real user with a narrowed scope, and a source field on the audit event so the Audit log can tell agent changes from human ones. Design: <code>docs/superpowers/specs/2026-09-19-mcp-agent-access-design.md</code>.</figcaption>
     </figure>
   </section>
 
