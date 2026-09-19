@@ -1,0 +1,666 @@
+<title>CMC Tracker Flow Map</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+  :root {
+    --ground: #f2f4f7;
+    --surface: #ffffff;
+    --ink: #1a222c;
+    --muted: #5c6874;
+    --line: #cfd6de;
+    --accent: #0e6f68;
+    --accent-soft: #d9efec;
+    --v2: #b45309;
+    --v2-soft: #fbe9d3;
+    --code-bg: #e9edf1;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --ground: #0f1418;
+      --surface: #171d23;
+      --ink: #e4e9ee;
+      --muted: #98a4b0;
+      --line: #313b45;
+      --accent: #3fc9bb;
+      --accent-soft: #123b38;
+      --v2: #f5a13a;
+      --v2-soft: #3e2a12;
+      --code-bg: #212a33;
+    }
+  }
+  :root[data-theme="dark"] {
+    --ground: #0f1418;
+    --surface: #171d23;
+    --ink: #e4e9ee;
+    --muted: #98a4b0;
+    --line: #313b45;
+    --accent: #3fc9bb;
+    --accent-soft: #123b38;
+    --v2: #f5a13a;
+    --v2-soft: #3e2a12;
+    --code-bg: #212a33;
+  }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif;
+    font-size: 15px;
+    line-height: 1.55;
+    padding-inline: 16px;
+    padding-block: 32px 64px;
+  }
+  main { max-width: 960px; margin-inline: auto; display: flex; flex-direction: column; gap: 40px; }
+  header { display: flex; flex-direction: column; gap: 8px; max-width: 64ch; }
+  .eyebrow { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); }
+  h1 { font-size: 30px; font-weight: 600; line-height: 1.15; margin: 0; text-wrap: balance; }
+  h2 { font-size: 20px; font-weight: 600; margin: 0; text-wrap: balance; }
+  p { margin: 0; color: var(--ink); max-width: 68ch; }
+  p.lead { color: var(--muted); }
+  section { display: flex; flex-direction: column; gap: 14px; }
+  figure { margin: 0; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 16px; overflow-x: auto; }
+  figure svg { display: block; max-width: 100%; height: auto; color: var(--ink); font-family: "IBM Plex Sans", "Segoe UI", Helvetica, Arial, sans-serif; }
+  figure svg .mono { font-family: "IBM Plex Mono", ui-monospace, monospace; }
+  figcaption { margin-top: 12px; font-size: 13px; color: var(--muted); max-width: 80ch; }
+  .legend { display: flex; flex-wrap: wrap; gap: 16px; font-size: 13px; color: var(--muted); align-items: center; }
+  .legend span { display: inline-flex; align-items: center; gap: 6px; }
+  .swatch { width: 22px; height: 12px; border-radius: 2px; border: 1.5px solid currentColor; }
+  .swatch.accent { background: var(--accent-soft); border-color: var(--accent); }
+  .swatch.v2 { background: var(--v2-soft); border-color: var(--v2); border-style: dashed; }
+  .swatch.opt { border-style: dashed; border-color: var(--muted); }
+  code { font-family: "IBM Plex Mono", ui-monospace, monospace; font-size: 0.88em; background: var(--code-bg); padding: 1px 5px; border-radius: 3px; }
+  table { border-collapse: collapse; width: 100%; font-size: 14px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+  th { font-weight: 600; font-size: 12px; letter-spacing: 0.05em; text-transform: uppercase; color: var(--muted); }
+  td:first-child { white-space: nowrap; font-weight: 500; }
+  .table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: 6px; }
+  ul { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; max-width: 70ch; }
+</style>
+
+<main>
+  <header>
+    <div class="eyebrow">Joint CMC Tracker · GS098 · v1 as shipped, V2.0 attachment points</div>
+    <h1>CMC Tracker Flow Map</h1>
+    <p class="lead">Six drawings of how the program is put together and how a request moves through it: deployment, code layers, the audited write path, the Excel pipeline, the data model, and the proposed agent path. Amber dashed marks show where work not yet built attaches.</p>
+    <div class="legend">
+      <span><i class="swatch"></i> v1 component</span>
+      <span><i class="swatch accent"></i> the piece the flow hinges on</span>
+      <span><i class="swatch opt"></i> optional (compose profile)</span>
+      <span><i class="swatch v2"></i> proposed (V2.0 / V2.1)</span>
+    </div>
+  </header>
+
+  <section>
+    <h2>1. Deployment: one image, one container, one volume</h2>
+    <figure>
+      <svg viewBox="0 0 960 340" role="img" aria-label="The browser talks to one app container on port 8000, optionally through a Caddy proxy; the container runs uvicorn serving both the API and the built SPA, stores data on the app-data volume as SQLite by default or PostgreSQL through a profile, and the image is built once by CI and pulled or loaded onto the server.">
+        <defs>
+          <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <!-- browser -->
+          <rect x="20" y="120" width="150" height="76" rx="4" fill="var(--surface)"/>
+          <text x="95" y="150" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Browser</text>
+          <text x="95" y="168" text-anchor="middle" fill="var(--muted)" stroke="none">React SPA + cookie</text>
+          <!-- caddy optional -->
+          <rect x="240" y="32" width="170" height="68" rx="4" stroke-dasharray="5 4" fill="var(--surface)"/>
+          <text x="325" y="56" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Caddy proxy</text>
+          <text x="325" y="74" text-anchor="middle" fill="var(--muted)" stroke="none">--profile proxy · TLS for DOMAIN</text>
+          <text x="325" y="90" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">:443</text>
+          <!-- app container -->
+          <rect x="460" y="70" width="300" height="200" rx="6" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="610" y="92" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">app container · uvicorn :8000</text>
+          <rect x="478" y="106" width="126" height="54" rx="4" fill="var(--surface)"/>
+          <text x="541" y="128" text-anchor="middle" fill="currentColor" stroke="none">FastAPI</text>
+          <text x="541" y="146" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">/api/*</text>
+          <rect x="616" y="106" width="126" height="54" rx="4" fill="var(--surface)"/>
+          <text x="679" y="128" text-anchor="middle" fill="currentColor" stroke="none">Static SPA</text>
+          <text x="679" y="146" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">/app/static → /*</text>
+          <rect x="478" y="176" width="264" height="82" rx="4" fill="var(--surface)"/>
+          <text x="610" y="196" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">entrypoint.sh (idempotent)</text>
+          <text x="610" y="214" text-anchor="middle" fill="var(--muted)" stroke="none">wait for DB → alembic upgrade head</text>
+          <text x="610" y="230" text-anchor="middle" fill="var(--muted)" stroke="none">→ bootstrap (admin, vocab, first import)</text>
+          <text x="610" y="246" text-anchor="middle" fill="var(--muted)" stroke="none">→ exec uvicorn</text>
+          <!-- volume -->
+          <rect x="820" y="96" width="120" height="64" rx="4" fill="var(--surface)"/>
+          <text x="880" y="118" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">app-data volume</text>
+          <text x="880" y="136" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">/data/app.db</text>
+          <text x="880" y="151" text-anchor="middle" fill="var(--muted)" stroke="none">SQLite (default)</text>
+          <!-- postgres optional -->
+          <rect x="820" y="196" width="120" height="64" rx="4" stroke-dasharray="5 4" fill="var(--surface)"/>
+          <text x="880" y="218" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">PostgreSQL 17</text>
+          <text x="880" y="236" text-anchor="middle" fill="var(--muted)" stroke="none">--profile postgres</text>
+          <text x="880" y="251" text-anchor="middle" fill="var(--muted)" stroke="none">via DATABASE_URL</text>
+          <!-- image source -->
+          <rect x="20" y="240" width="230" height="70" rx="4" fill="var(--surface)"/>
+          <text x="135" y="262" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Image built once, never on server</text>
+          <text x="135" y="280" text-anchor="middle" fill="var(--muted)" stroke="none">CI release.yml on v* tag → GHCR</text>
+          <text x="135" y="296" text-anchor="middle" fill="var(--muted)" stroke="none">or docker save → tarball → docker load</text>
+          <!-- arrows -->
+          <line x1="170" y1="158" x2="458" y2="158" marker-end="url(#a1)"/>
+          <text x="314" y="150" text-anchor="middle" fill="var(--muted)" stroke="none">http :8000 (intranet)</text>
+          <polyline points="170,140 210,140 210,66 238,66" marker-end="url(#a1)" stroke-dasharray="5 4"/>
+          <text x="190" y="112" text-anchor="middle" fill="var(--muted)" stroke="none">https</text>
+          <polyline points="410,66 440,66 440,110 458,110" marker-end="url(#a1)" stroke-dasharray="5 4"/>
+          <line x1="760" y1="128" x2="818" y2="128" marker-end="url(#a1)"/>
+                    <polyline points="760,150 790,150 790,228 818,228" marker-end="url(#a1)" stroke-dasharray="5 4"/>
+          <polyline points="250,275 350,275 350,300 610,300 610,272" marker-end="url(#a1)"/>
+          <text x="480" y="292" text-anchor="middle" fill="var(--muted)" stroke="none">docker compose pull / up -d</text>
+          <!-- health -->
+          <text x="610" y="330" text-anchor="middle" fill="var(--muted)" stroke="none">healthcheck: GET /api/health every 30 s → compose ps shows readiness; proxy waits for it</text>
+        </g>
+      </svg>
+      <figcaption>Everything a server needs is <code>docker-compose.yml</code> and <code>.env</code>. The same container serves the API and the built frontend; a backup is a copy of one file on the volume. V2.0 changes nothing in this picture, which is why a v1 <code>.env</code> still boots it.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>2. Code layers and where V2.0 attaches</h2>
+    <figure>
+      <svg viewBox="0 0 960 650" role="img" aria-label="Frontend layers (app shell, features, query hooks, API client, UI components) on the left call the backend layers on the right (main.py middleware, thin routers, dependencies, services that own writes and audit, importers and exporters, models and migrations, CLI). V2.0 additions are marked in each layer: audit and report screens and locales; reports and activity export routers; report and audit services; new workbooks; migration 0002; explainer CLI commands.">
+        <defs>
+          <marker id="a2" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <text x="20" y="28" fill="currentColor" stroke="none" font-weight="600" font-size="13">frontend/src</text>
+          <text x="470" y="28" fill="currentColor" stroke="none" font-weight="600" font-size="13">backend/app</text>
+
+          <!-- FRONTEND bands: x 20..430 -->
+          <!-- app shell -->
+          <rect x="20" y="44" width="410" height="80" rx="4" fill="var(--surface)"/>
+          <text x="32" y="64" fill="currentColor" stroke="none" font-weight="600">app/  shell and routing</text>
+          <text x="32" y="82" fill="var(--muted)" stroke="none">router · ProtectedRoute · AdminRoute · AppLayout</text>
+          <text x="32" y="98" fill="var(--muted)" stroke="none">Providers: QueryClient · Theme · Toast · Tooltip</text>
+          <rect x="250" y="88" width="170" height="28" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="335" y="106" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">/reports · /admin/audit</text>
+
+          <!-- features -->
+          <rect x="20" y="140" width="410" height="96" rx="4" fill="var(--surface)"/>
+          <text x="32" y="160" fill="currentColor" stroke="none" font-weight="600">features/  one folder per screen</text>
+          <text x="32" y="178" fill="var(--muted)" stroke="none">auth · dashboard · items · item-detail · board</text>
+          <text x="32" y="194" fill="var(--muted)" stroke="none">admin: users · vocab · import · export</text>
+          <rect x="32" y="204" width="386" height="24" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="225" y="220" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">admin/audit · reports · locales en/zh-CN · translation</text>
+
+          <!-- hooks -->
+          <rect x="20" y="252" width="410" height="66" rx="4" fill="var(--surface)"/>
+          <text x="32" y="272" fill="currentColor" stroke="none" font-weight="600">hooks  TanStack Query</text>
+          <text x="32" y="290" fill="var(--muted)" stroke="none">qk.* keys per resource · mutations setQueryData + invalidate</text>
+          <text x="32" y="306" fill="var(--muted)" stroke="none">board move: optimistic update, rollback on error</text>
+
+          <!-- api client -->
+          <rect x="20" y="334" width="410" height="80" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="32" y="354" fill="currentColor" stroke="none" font-weight="600">lib/api  apiFetch</text>
+          <text x="32" y="372" fill="var(--muted)" stroke="none">adds X-Requested-With: fetch · same-origin cookie</text>
+          <text x="32" y="388" fill="var(--muted)" stroke="none">unwraps {success, data, error, meta} · 401 → auth-expired event</text>
+          <text x="32" y="404" fill="var(--muted)" stroke="none">types.ts ← schema.d.ts generated from /api/openapi.json</text>
+
+          <!-- components -->
+          <rect x="20" y="430" width="410" height="66" rx="4" fill="var(--surface)"/>
+          <text x="32" y="450" fill="currentColor" stroke="none" font-weight="600">components/  ui + domain</text>
+          <text x="32" y="468" fill="var(--muted)" stroke="none">Radix primitives · badges · DueDate · RelativeTime · DiffTable</text>
+          <rect x="32" y="474" width="200" height="18" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="132" y="487" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">labels via t() · PeriodPicker</text>
+
+          <!-- BACKEND bands: x 470..940 -->
+          <!-- main.py -->
+          <rect x="470" y="44" width="470" height="66" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="482" y="64" fill="currentColor" stroke="none" font-weight="600">main.py  app factory + middleware</text>
+          <text x="482" y="82" fill="var(--muted)" stroke="none">request id · CSRF header check on mutations · error → envelope</text>
+          <text x="482" y="98" fill="var(--muted)" stroke="none">SPA fallback for non-/api paths · /api/docs</text>
+
+          <!-- api -->
+          <rect x="470" y="126" width="470" height="80" rx="4" fill="var(--surface)"/>
+          <text x="482" y="146" fill="currentColor" stroke="none" font-weight="600">api/  thin routers, no DB access</text>
+          <text x="482" y="164" fill="var(--muted)" stroke="none">health · auth · users · invitations · vocab · items · updates</text>
+          <text x="482" y="180" fill="var(--muted)" stroke="none">activity · dashboard · imports · exports</text>
+          <rect x="740" y="172" width="190" height="26" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="835" y="189" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">reports · activity/export</text>
+
+          <!-- deps -->
+          <rect x="470" y="222" width="470" height="50" rx="4" fill="var(--surface)"/>
+          <text x="482" y="242" fill="currentColor" stroke="none" font-weight="600">api/deps.py</text>
+          <text x="482" y="260" fill="var(--muted)" stroke="none" class="mono" font-size="11">DbDep · CurrentUser (cookie→session) · AdminUser · ProgramDep</text>
+
+          <!-- services -->
+          <rect x="470" y="288" width="470" height="96" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="482" y="308" fill="currentColor" stroke="none" font-weight="600">services/  the only DB writers · audit event in the same transaction</text>
+          <text x="482" y="326" fill="var(--muted)" stroke="none">auth · users · invitations · vocab · items · updates · audit · dashboard</text>
+          <text x="482" y="342" fill="var(--muted)" stroke="none">bootstrap · rate_limit · errors (typed → 404/403/409/422)</text>
+          <rect x="482" y="350" width="446" height="26" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="705" y="367" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">reports/ (as-of, build) · audit filters + labels · i18n/labels.py</text>
+
+          <!-- importers/exporters -->
+          <rect x="470" y="400" width="470" height="66" rx="4" fill="var(--surface)"/>
+          <text x="482" y="420" fill="currentColor" stroke="none" font-weight="600">importers/excel  parse → normalize → preview → commit   ·   exporters/excel</text>
+          <rect x="482" y="432" width="446" height="26" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="705" y="449" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">shared row writer · exporters/audit · exporters/report · zh column</text>
+
+          <!-- models -->
+          <rect x="470" y="482" width="290" height="96" rx="4" fill="var(--surface)"/>
+          <text x="482" y="502" fill="currentColor" stroke="none" font-weight="600">models/ + alembic/</text>
+          <text x="482" y="520" fill="var(--muted)" stroke="none">program · user · session · invitation</text>
+          <text x="482" y="536" fill="var(--muted)" stroke="none">action_item · item_update</text>
+          <text x="482" y="552" fill="var(--muted)" stroke="none">vocab_term · audit_event   (0001)</text>
+          <rect x="482" y="558" width="266" height="16" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="615" y="570" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">0002: locale · *_zh · label_zh · idx</text>
+
+          <!-- cli -->
+          <rect x="776" y="482" width="164" height="96" rx="4" fill="var(--surface)"/>
+          <text x="788" y="502" fill="currentColor" stroke="none" font-weight="600">cli.py (Typer)</text>
+          <text x="788" y="520" fill="var(--muted)" stroke="none">bootstrap · create-admin</text>
+          <text x="788" y="536" fill="var(--muted)" stroke="none">import-excel · export-excel</text>
+          <text x="788" y="552" fill="var(--muted)" stroke="none">calls services directly</text>
+          <rect x="788" y="558" width="140" height="16" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="858" y="570" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="10">report-explain · audit</text>
+
+          <!-- db -->
+          <rect x="470" y="594" width="470" height="40" rx="4" fill="var(--surface)"/>
+          <text x="705" y="618" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">SQLAlchemy 2 engine · engine-neutral schema · SQLite or PostgreSQL</text>
+
+          <!-- vertical flow arrows frontend -->
+          <line x1="225" y1="124" x2="225" y2="138" marker-end="url(#a2)"/>
+          <line x1="225" y1="236" x2="225" y2="250" marker-end="url(#a2)"/>
+          <line x1="225" y1="318" x2="225" y2="332" marker-end="url(#a2)"/>
+          <!-- backend vertical arrows -->
+          <line x1="705" y1="110" x2="705" y2="124" marker-end="url(#a2)"/>
+          <line x1="705" y1="206" x2="705" y2="220" marker-end="url(#a2)"/>
+          <line x1="705" y1="272" x2="705" y2="286" marker-end="url(#a2)"/>
+          <line x1="705" y1="384" x2="705" y2="398" marker-end="url(#a2)"/>
+          <line x1="620" y1="466" x2="620" y2="480" marker-end="url(#a2)"/>
+          <line x1="620" y1="578" x2="620" y2="592" marker-end="url(#a2)"/>
+          <!-- cross arrow: apiFetch -> main.py -->
+          <polyline points="430,374 450,374 450,77 468,77" marker-end="url(#a2)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="437" y="230" fill="var(--accent)" stroke="none" text-anchor="middle" font-size="11" transform="rotate(-90 437 230)">HTTP JSON  /api  · cookie session</text>
+        </g>
+      </svg>
+      <figcaption>Read each column top to bottom. The two highlighted bands are the contract everything else obeys: the frontend never touches the network except through <code>apiFetch</code>, and the backend never writes the database except through a service, which records the audit event in the same transaction. Every V2.0 feature lands inside an existing layer; no layer is added.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>3. One audited write, end to end</h2>
+    <figure>
+      <svg viewBox="0 0 960 410" role="img" aria-label="A PATCH to an item flows from the UI mutation through apiFetch, the middleware, the dependencies, the router, and the items service into the database in one transaction that writes both the item and its audit event; the response envelope returns to the client, which updates the detail cache and invalidates the list and history queries.">
+        <defs>
+          <marker id="a3" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <text x="20" y="28" fill="currentColor" stroke="none" font-weight="600" font-size="13">Request  ·  PATCH /api/items/42  {status: "blocked"}  (the board drag sends exactly this)</text>
+          <!-- request row: 7 boxes, x = 20 + i*135, w=122 -->
+          <rect x="20" y="48" width="122" height="96" rx="4" fill="var(--surface)"/>
+          <text x="81" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">UI</text>
+          <text x="81" y="86" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">usePatchItem(42)</text>
+          <text x="81" y="104" text-anchor="middle" fill="var(--muted)" stroke="none">form or drag</text>
+          <text x="81" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">calls mutate()</text>
+
+          <rect x="155" y="48" width="122" height="96" rx="4" fill="var(--surface)"/>
+          <text x="216" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">apiFetch</text>
+          <text x="216" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">JSON body</text>
+          <text x="216" y="104" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">X-Requested-With</text>
+          <text x="216" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">session cookie</text>
+
+          <rect x="290" y="48" width="122" height="96" rx="4" fill="var(--surface)"/>
+          <text x="351" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">middleware</text>
+          <text x="351" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">assign request id</text>
+          <text x="351" y="104" text-anchor="middle" fill="var(--muted)" stroke="none">no CSRF header</text>
+          <text x="351" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">→ 403 envelope</text>
+
+          <rect x="425" y="48" width="122" height="96" rx="4" fill="var(--surface)"/>
+          <text x="486" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">deps</text>
+          <text x="486" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">cookie → session</text>
+          <text x="486" y="104" text-anchor="middle" fill="var(--muted)" stroke="none">sliding expiry → user</text>
+          <text x="486" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">program GS098</text>
+
+          <rect x="560" y="48" width="122" height="96" rx="4" fill="var(--surface)"/>
+          <text x="621" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">api/items.py</text>
+          <text x="621" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">pydantic ItemPatch</text>
+          <text x="621" y="104" text-anchor="middle" fill="var(--muted)" stroke="none">invalid → 422</text>
+          <text x="621" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">with fields map</text>
+
+          <rect x="695" y="48" width="122" height="96" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="756" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">services/items</text>
+          <text x="756" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">snapshot → apply</text>
+          <text x="756" y="104" text-anchor="middle" fill="var(--muted)" stroke="none">vocab + kind rules</text>
+          <text x="756" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">diff → record_event</text>
+
+          <rect x="830" y="48" width="110" height="96" rx="4" fill="var(--surface)"/>
+          <text x="885" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">database</text>
+          <text x="885" y="86" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">action_item</text>
+          <text x="885" y="104" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">audit_event</text>
+          <text x="885" y="120" text-anchor="middle" fill="var(--muted)" stroke="none">one commit</text>
+
+          <line x1="142" y1="96" x2="153" y2="96" marker-end="url(#a3)"/>
+          <line x1="277" y1="96" x2="288" y2="96" marker-end="url(#a3)"/>
+          <line x1="412" y1="96" x2="423" y2="96" marker-end="url(#a3)"/>
+          <line x1="547" y1="96" x2="558" y2="96" marker-end="url(#a3)"/>
+          <line x1="682" y1="96" x2="693" y2="96" marker-end="url(#a3)"/>
+          <line x1="817" y1="96" x2="828" y2="96" marker-end="url(#a3)"/>
+
+          <!-- transaction bracket -->
+          <path d="M695,156 L695,166 L940,166 L940,156" stroke="var(--accent)"/>
+          <text x="700" y="184" text-anchor="middle" fill="var(--accent)" stroke="none" font-size="11">same Session, same transaction: item update and audit row commit together or not at all</text>
+
+          <!-- response row -->
+          <text x="20" y="228" fill="currentColor" stroke="none" font-weight="600" font-size="13">Response  ·  envelope {success, data: ItemOut, error, meta}  +  X-Request-Id</text>
+          <rect x="830" y="248" width="110" height="96" rx="4" fill="var(--surface)"/>
+          <text x="885" y="270" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">router</text>
+          <text x="885" y="288" text-anchor="middle" fill="var(--muted)" stroke="none">ItemOut DTO</text>
+          <text x="885" y="304" text-anchor="middle" fill="var(--muted)" stroke="none">ok(data)</text>
+
+          <rect x="560" y="248" width="230" height="96" rx="4" fill="var(--surface)"/>
+          <text x="675" y="270" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">error handlers (main.py)</text>
+          <text x="675" y="288" text-anchor="middle" fill="var(--muted)" stroke="none">DomainError → 404/403/409/422</text>
+          <text x="675" y="304" text-anchor="middle" fill="var(--muted)" stroke="none">validation → 422 + fields map</text>
+          <text x="675" y="320" text-anchor="middle" fill="var(--muted)" stroke="none">unexpected → 500, request id logged</text>
+
+          <rect x="290" y="248" width="230" height="96" rx="4" fill="var(--surface)"/>
+          <text x="405" y="270" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">apiFetch</text>
+          <text x="405" y="288" text-anchor="middle" fill="var(--muted)" stroke="none">success → data</text>
+          <text x="405" y="304" text-anchor="middle" fill="var(--muted)" stroke="none">failure → ApiError(code, fields)</text>
+          <text x="405" y="320" text-anchor="middle" fill="var(--muted)" stroke="none">401 → auth-expired → login page</text>
+
+          <rect x="20" y="248" width="230" height="96" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="135" y="270" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">TanStack Query cache</text>
+          <text x="135" y="288" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">setQueryData(detail(42))</text>
+          <text x="135" y="304" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">invalidate list · history(42)</text>
+          <text x="135" y="320" text-anchor="middle" fill="var(--muted)" stroke="none">toast on error</text>
+
+          <line x1="828" y1="288" x2="792" y2="288" marker-end="url(#a3)"/>
+          <line x1="558" y1="288" x2="522" y2="288" marker-end="url(#a3)"/>
+          <line x1="288" y1="288" x2="252" y2="288" marker-end="url(#a3)"/>
+          <text x="20" y="372" fill="var(--muted)" stroke="none">table, board, detail sheet and History tab re-render;</text>
+          <text x="20" y="388" fill="var(--muted)" stroke="none">the dashboard feed shows the event on its next fetch</text>
+          <text x="560" y="372" fill="var(--muted)" stroke="none">the Audit log page (V2.0) reads the same audit_event rows;</text>
+          <text x="560" y="388" fill="var(--muted)" stroke="none">the period report (V2.0) replays them for status as of a date</text>
+        </g>
+      </svg>
+      <figcaption>Every mutation in the app is this shape. Reads follow the same path without the service transaction. Because the audit row is written by the same service call, the trail is complete by construction, which is what makes both the V2.0 audit log and the as-of report reconstruction possible without new tables.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>4. Excel in and out</h2>
+    <figure>
+      <svg viewBox="0 0 960 300" role="img" aria-label="Import: an xlsx file is parsed into raw rows, normalized against vocabularies and the owner and status mappings, previewed with warnings and unmapped values, the admin supplies overrides, and commit inserts items, updates, vocab terms and one import audit event in a single transaction. Export: filtered items are rendered back into the familiar Action Item workbook.">
+        <defs>
+          <marker id="a4" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <text x="20" y="28" fill="currentColor" stroke="none" font-weight="600" font-size="13">Import (admin, or cli import-excel, or the first boot via INITIAL_IMPORT_PATH)</text>
+          <rect x="20" y="46" width="110" height="88" rx="4" fill="var(--surface)"/>
+          <text x="75" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">xlsx</text>
+          <text x="75" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">sheet</text>
+          <text x="75" y="102" text-anchor="middle" fill="var(--muted)" stroke="none">"Action Item"</text>
+          <text x="75" y="118" text-anchor="middle" fill="var(--muted)" stroke="none">13 headers</text>
+
+          <rect x="150" y="46" width="130" height="88" rx="4" fill="var(--surface)"/>
+          <text x="215" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">parse.read_rows</text>
+          <text x="215" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">header map</text>
+          <text x="215" y="102" text-anchor="middle" fill="var(--muted)" stroke="none">extra cols ignored</text>
+          <text x="215" y="118" text-anchor="middle" fill="var(--muted)" stroke="none">missing → fail fast</text>
+
+          <rect x="300" y="46" width="150" height="88" rx="4" fill="var(--surface)"/>
+          <text x="375" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">normalize_row</text>
+          <text x="375" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">dates · owner map · vocab</text>
+          <text x="375" y="102" text-anchor="middle" fill="var(--muted)" stroke="none">NA status → kind note</text>
+          <text x="375" y="118" text-anchor="middle" fill="var(--muted)" stroke="none">UPDATE-YYYYMMDD split</text>
+
+          <rect x="470" y="46" width="140" height="88" rx="4" fill="var(--surface)"/>
+          <text x="540" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">build_preview</text>
+          <text x="540" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">counts · warnings</text>
+          <text x="540" y="102" text-anchor="middle" fill="var(--muted)" stroke="none">unmapped values</text>
+          <text x="540" y="118" text-anchor="middle" fill="var(--muted)" stroke="none">entry_no conflicts</text>
+
+          <rect x="630" y="46" width="130" height="88" rx="4" fill="var(--surface)" stroke-dasharray="5 4"/>
+          <text x="695" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">admin overrides</text>
+          <text x="695" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">raw → canonical</text>
+          <text x="695" y="102" text-anchor="middle" fill="var(--muted)" stroke="none">or new vocab term</text>
+          <text x="695" y="118" text-anchor="middle" fill="var(--muted)" stroke="none">UnmappedPicker UI</text>
+
+          <rect x="780" y="46" width="160" height="88" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="860" y="68" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">commit_import</text>
+          <text x="860" y="86" text-anchor="middle" fill="var(--muted)" stroke="none">all-or-nothing</text>
+          <text x="860" y="102" text-anchor="middle" fill="var(--muted)" stroke="none">items + updates + terms</text>
+          <text x="860" y="118" text-anchor="middle" fill="var(--muted)" stroke="none">+ audit "imported"</text>
+
+          <line x1="130" y1="90" x2="148" y2="90" marker-end="url(#a4)"/>
+          <line x1="280" y1="90" x2="298" y2="90" marker-end="url(#a4)"/>
+          <line x1="450" y1="90" x2="468" y2="90" marker-end="url(#a4)"/>
+          <line x1="610" y1="90" x2="628" y2="90" marker-end="url(#a4)"/>
+          <line x1="760" y1="90" x2="778" y2="90" marker-end="url(#a4)"/>
+          <polyline points="695,134 695,156 375,156 375,136" marker-end="url(#a4)"/>
+          <text x="535" y="150" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">re-run normalization with overrides; any leftover unmapped value aborts</text>
+          <rect x="250" y="166" width="400" height="20" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="450" y="180" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">V2.0: "Translation in Mandarin" → title_zh / details_zh</text>
+
+          <text x="20" y="222" fill="currentColor" stroke="none" font-weight="600" font-size="13">Export (any user, same filters as the Items table)</text>
+          <rect x="20" y="238" width="200" height="50" rx="4" fill="var(--surface)"/>
+          <text x="120" y="259" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">list_items(ItemFilters)</text>
+          <text x="120" y="277" text-anchor="middle" fill="var(--muted)" stroke="none">status · group · owner · q · due range</text>
+          <rect x="250" y="238" width="220" height="50" rx="4" fill="var(--surface)"/>
+          <text x="360" y="259" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">build_program_export</text>
+          <text x="360" y="277" text-anchor="middle" fill="var(--muted)" stroke="none">original columns + Last Updated/By</text>
+          <rect x="500" y="238" width="120" height="50" rx="4" fill="var(--surface)"/>
+          <text x="560" y="259" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">xlsx</text>
+          <text x="560" y="277" text-anchor="middle" fill="var(--muted)" stroke="none">Content-Disposition</text>
+          <rect x="650" y="238" width="290" height="50" rx="4" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="795" y="259" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">V2.0 reuses the same row writer</text>
+          <text x="795" y="277" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">audit-log.xlsx · period report</text>
+          <line x1="220" y1="263" x2="248" y2="263" marker-end="url(#a4)"/>
+          <line x1="470" y1="263" x2="498" y2="263" marker-end="url(#a4)"/>
+          <line x1="620" y1="263" x2="648" y2="263" marker-end="url(#a4)" stroke="var(--v2)" stroke-dasharray="4 3"/>
+        </g>
+      </svg>
+      <figcaption>Import is a two-step preview-then-commit so nothing lands until every value maps to a vocabulary term; commit refuses duplicate entry numbers, which makes re-running with a file of only new rows safe. Export is the read side of the same shape, and V2.0's workbooks are built on its row writer rather than a second one.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>5. Data model</h2>
+    <figure>
+      <svg viewBox="0 0 960 380" role="img" aria-label="Entities and their links: program owns action items and vocabulary terms; action items have updates, an optional assignee, and created, updated and deleted-by users; users have sessions and invitations; audit events point at any entity by type and id and always name an actor. V2.0 adds locale on user, Chinese title and details on action item, and a Chinese label on vocabulary terms.">
+        <defs>
+          <marker id="a5" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <!-- program -->
+          <rect x="20" y="130" width="150" height="70" rx="4" fill="var(--surface)"/>
+          <text x="95" y="150" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">program</text>
+          <text x="95" y="168" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono">code GS098 · name</text>
+          <text x="95" y="186" text-anchor="middle" fill="var(--muted)" stroke="none">multi-program ready</text>
+
+          <!-- action_item -->
+          <rect x="240" y="90" width="280" height="150" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="380" y="110" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">action_item</text>
+          <text x="252" y="130" fill="var(--muted)" stroke="none" class="mono" font-size="11">entry_no (unique per program)</text>
+          <text x="252" y="146" fill="var(--muted)" stroke="none" class="mono" font-size="11">kind action|note · status · priority</text>
+          <text x="252" y="162" fill="var(--muted)" stroke="none" class="mono" font-size="11">group · category · owner_org · assignee_id</text>
+          <text x="252" y="178" fill="var(--muted)" stroke="none" class="mono" font-size="11">raised_on · due_on · completed_on</text>
+          <text x="252" y="194" fill="var(--muted)" stroke="none" class="mono" font-size="11">provenance JSON · deleted_at (soft)</text>
+          <rect x="252" y="204" width="256" height="26" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="380" y="221" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">V2.0  title_zh · details_zh</text>
+
+          <!-- item_update -->
+          <rect x="560" y="120" width="200" height="80" rx="4" fill="var(--surface)"/>
+          <text x="660" y="140" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">item_update</text>
+          <text x="660" y="158" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">body · occurred_on</text>
+          <text x="660" y="174" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">author_id · edited_at</text>
+          <text x="660" y="190" text-anchor="middle" fill="var(--muted)" stroke="none">the dated timeline</text>
+
+          <!-- user -->
+          <rect x="560" y="14" width="200" height="86" rx="4" fill="var(--surface)"/>
+          <text x="660" y="34" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">user</text>
+          <text x="660" y="52" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">email · org · role</text>
+          <text x="660" y="68" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">is_active · last_login_at</text>
+          <rect x="572" y="74" width="176" height="18" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="660" y="87" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">V2.0  locale</text>
+
+          <!-- session / invitation -->
+          <rect x="780" y="14" width="160" height="50" rx="4" fill="var(--surface)"/>
+          <text x="860" y="34" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">session</text>
+          <text x="860" y="52" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">token_hash · expires</text>
+          <rect x="780" y="80" width="160" height="66" rx="4" fill="var(--surface)"/>
+          <text x="860" y="100" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">invitation</text>
+          <text x="860" y="118" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">purpose invite|reset</text>
+          <text x="860" y="134" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">token · accepted_at</text>
+
+          <!-- vocab_term -->
+          <rect x="20" y="250" width="220" height="86" rx="4" fill="var(--surface)"/>
+          <text x="130" y="270" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">vocab_term</text>
+          <text x="130" y="288" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">field group|category · value</text>
+          <text x="130" y="304" text-anchor="middle" fill="var(--muted)" stroke="none" class="mono" font-size="11">sort_order · is_active</text>
+          <rect x="32" y="312" width="196" height="18" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="130" y="325" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="11">V2.0  label_zh</text>
+
+          <!-- audit_event -->
+          <rect x="270" y="270" width="500" height="90" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="520" y="290" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">audit_event  (append-only)</text>
+          <text x="282" y="310" fill="var(--muted)" stroke="none" class="mono" font-size="11">entity_type item|update|user|invitation|vocab|import · entity_id</text>
+          <text x="282" y="326" fill="var(--muted)" stroke="none" class="mono" font-size="11">action created|updated|deleted|restored|status_changed|…</text>
+          <text x="282" y="342" fill="var(--muted)" stroke="none" class="mono" font-size="11">actor_id → user (never null) · occurred_at · changes {old,new} · summary</text>
+          <rect x="790" y="270" width="150" height="90" rx="4" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="865" y="292" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">V2.0</text>
+          <text x="865" y="310" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono">+ signed_in</text>
+          <text x="865" y="326" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono">+ sign_in_failed</text>
+          <text x="865" y="342" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono">+ 2 indexes</text>
+
+          <!-- relations -->
+          <line x1="170" y1="165" x2="238" y2="165" marker-end="url(#a5)"/>
+          <text x="204" y="158" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">owns</text>
+          <polyline points="95,200 95,230 130,230 130,248" marker-end="url(#a5)"/>
+          <text x="150" y="240" fill="var(--muted)" stroke="none" font-size="11">seeds</text>
+          <line x1="520" y1="170" x2="558" y2="170" marker-end="url(#a5)"/>
+          <text x="539" y="184" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="10">has many</text>
+          <polyline points="520,110 540,110 540,49 558,49" marker-end="url(#a5)"/>
+          <text x="533" y="80" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="10" transform="rotate(-90 533 80)">assignee · by</text>
+          <line x1="760" y1="39" x2="778" y2="39" marker-end="url(#a5)"/>
+          <polyline points="760,60 770,60 770,113 778,113" marker-end="url(#a5)"/>
+          <polyline points="380,240 380,268" marker-end="url(#a5)" stroke-dasharray="3 3"/>
+          <polyline points="660,200 660,268" marker-end="url(#a5)" stroke-dasharray="3 3"/>
+          <text x="520" y="258" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">entity_type + entity_id (no FK, points at anything)</text>
+        </g>
+      </svg>
+      <figcaption>Everything hangs off the program, so a second program is a data change rather than a schema change. The audit event is deliberately not foreign-keyed to its entity: it must survive whatever happens to the row it describes. All V2.0 columns are nullable additions in migration 0002.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>6. Agent access via MCP (V2.1 proposal)</h2>
+    <figure>
+      <svg viewBox="0 0 960 330" role="img" aria-label="An agent client connects to a streamable HTTP MCP endpoint mounted at /mcp in the same container, authenticating with a bearer API token that resolves to a real user and a scope. The MCP tool layer sits beside the REST routers and calls the same service layer, so the write lands in one transaction with an audit event tagged as coming from an agent.">
+        <defs>
+          <marker id="a6" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+          </marker>
+        </defs>
+        <g stroke="currentColor" stroke-width="1.3" fill="none" font-size="12">
+          <!-- clients -->
+          <rect x="20" y="40" width="170" height="76" rx="4" fill="var(--surface)"/>
+          <text x="105" y="62" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Agent client</text>
+          <text x="105" y="80" text-anchor="middle" fill="var(--muted)" stroke="none">Claude Code · claude.ai</text>
+          <text x="105" y="96" text-anchor="middle" fill="var(--muted)" stroke="none">Claude Desktop</text>
+          <text x="105" y="111" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">stdio only → mcp-remote bridge</text>
+
+          <rect x="20" y="150" width="170" height="70" rx="4" fill="var(--surface)"/>
+          <text x="105" y="172" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">Browser (unchanged)</text>
+          <text x="105" y="190" text-anchor="middle" fill="var(--muted)" stroke="none">React SPA</text>
+          <text x="105" y="206" text-anchor="middle" fill="var(--muted)" stroke="none">session cookie</text>
+
+          <!-- container -->
+          <rect x="300" y="24" width="470" height="272" rx="6" stroke="var(--line)" fill="none"/>
+          <text x="312" y="44" fill="var(--muted)" stroke="none" font-size="11">same app container · same image · no new port</text>
+
+          <!-- mcp adapter -->
+          <rect x="320" y="56" width="200" height="86" rx="4" stroke="var(--v2)" stroke-dasharray="5 4" fill="var(--v2-soft)"/>
+          <text x="420" y="78" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">app/mcp/  →  /mcp</text>
+          <text x="420" y="96" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">streamable HTTP · FastMCP</text>
+          <text x="420" y="112" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">14 tools · dry_run · scopes</text>
+          <text x="420" y="128" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">errors name the valid values</text>
+
+          <!-- api routers -->
+          <rect x="320" y="158" width="200" height="62" rx="4" fill="var(--surface)"/>
+          <text x="420" y="180" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">app/api/  →  /api/*</text>
+          <text x="420" y="198" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">routers · CSRF header</text>
+          <text x="420" y="213" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">envelope responses</text>
+
+          <!-- principal -->
+          <rect x="320" y="236" width="200" height="46" rx="4" stroke="var(--v2)" stroke-dasharray="5 4" fill="var(--v2-soft)"/>
+          <text x="420" y="256" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">get_current_principal</text>
+          <text x="420" y="273" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">token or cookie → (user, via, scope)</text>
+
+          <!-- services -->
+          <rect x="560" y="96" width="190" height="96" rx="4" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="1.6"/>
+          <text x="655" y="118" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">app/services/</text>
+          <text x="655" y="136" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">the only DB writers</text>
+          <text x="655" y="152" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">validation · permissions</text>
+          <text x="655" y="168" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">audit event in the</text>
+          <text x="655" y="183" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">same transaction</text>
+
+          <rect x="560" y="216" width="190" height="66" rx="4" fill="var(--surface)"/>
+          <text x="655" y="238" text-anchor="middle" fill="currentColor" stroke="none" font-weight="600">audit_event</text>
+          <text x="655" y="256" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">actor_id · changes · summary</text>
+          <rect x="572" y="262" width="166" height="16" rx="3" stroke="var(--v2)" stroke-dasharray="4 3" fill="var(--v2-soft)"/>
+          <text x="655" y="274" text-anchor="middle" fill="var(--v2)" stroke="none" class="mono" font-size="10">+ via · token_name</text>
+
+          <!-- token store -->
+          <rect x="800" y="56" width="140" height="86" rx="4" stroke="var(--v2)" stroke-dasharray="5 4" fill="var(--v2-soft)"/>
+          <text x="870" y="78" text-anchor="middle" fill="var(--v2)" stroke="none" font-weight="600">api_token</text>
+          <text x="870" y="96" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">hashed · prefix shown</text>
+          <text x="870" y="112" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">scopes read|write</text>
+          <text x="870" y="128" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">expiry · revoke</text>
+
+          <!-- arrows -->
+          <line x1="190" y1="88" x2="318" y2="88" marker-end="url(#a6)" stroke="var(--v2)"/>
+          <text x="254" y="80" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">Bearer cmct_…</text>
+          <line x1="190" y1="186" x2="318" y2="186" marker-end="url(#a6)"/>
+          <text x="254" y="178" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">cookie</text>
+          <polyline points="420,142 420,150" marker-end="url(#a6)" stroke-dasharray="3 3"/>
+          <polyline points="420,220 420,234" marker-end="url(#a6)" stroke-dasharray="3 3"/>
+          <line x1="520" y1="99" x2="558" y2="120" marker-end="url(#a6)" stroke="var(--accent)" stroke-width="1.6"/>
+          <line x1="520" y1="189" x2="558" y2="168" marker-end="url(#a6)" stroke="var(--accent)" stroke-width="1.6"/>
+          <line x1="520" y1="259" x2="558" y2="248" marker-end="url(#a6)" stroke-dasharray="3 3"/>
+          <polyline points="798,72 778,72 778,40 544,40 544,66 526,66" marker-end="url(#a6)" stroke="var(--v2)" stroke-dasharray="4 3"/>
+          <text x="700" y="34" text-anchor="middle" fill="var(--v2)" stroke="none" font-size="11">resolve · scope check · rate limit</text>
+          <line x1="655" y1="192" x2="655" y2="214" marker-end="url(#a6)"/>
+          <text x="880" y="180" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">No MCP tool for</text>
+          <text x="880" y="196" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">delete · restore</text>
+          <text x="880" y="212" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">users · vocab · import</text>
+          <text x="880" y="228" text-anchor="middle" fill="var(--muted)" stroke="none" font-size="11">— web UI only</text>
+        </g>
+      </svg>
+      <figcaption>The agent path is the same mechanism as figure 3 entered through a different door. The MCP tool layer is a sibling of the REST routers, not a layer above them, so an agent write gets the identical validation, permission check and audit row a person's write gets. Two additions make it accountable: a bearer token that resolves to a real user with a narrowed scope, and a source field on the audit event so the Audit log can tell agent changes from human ones. Design: <code>docs/superpowers/specs/2026-09-19-mcp-agent-access-design.md</code>.</figcaption>
+    </figure>
+  </section>
+
+  <section>
+    <h2>Where to extend</h2>
+    <p class="lead">The path a change takes through the layers above, for the kinds of change this project sees most. Follow the order; the type generation step is what keeps the two halves honest.</p>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Change</th><th>Touch, in order</th><th>Test</th></tr></thead>
+        <tbody>
+          <tr><td>New endpoint</td><td><code>schemas/</code> DTO → <code>services/</code> function → <code>api/</code> router → <code>api/router.py</code> include → regenerate <code>openapi.json</code> and <code>npm run gen:api</code> → hook in <code>features/&lt;x&gt;/use*.ts</code> → screen</td><td>unit test on the service, API test on the route (happy, auth, validation), Vitest on the hook or screen</td></tr>
+          <tr><td>New item field</td><td>alembic migration (additive, nullable) → <code>models/action_item.py</code> → <code>SNAPSHOT_FIELDS</code> in <code>services/items.py</code> so it is audited → <code>schemas/items.py</code> → importer/exporter column → regenerate types → <code>item-schema.ts</code> + <code>ItemForm</code> → table column</td><td>migration apply/revert, audit diff includes the field, import/export round-trip</td></tr>
+          <tr><td>New audited action</td><td><code>constants.py</code> action list → service calls <code>record_event</code> in the same session before commit → summary renderer on the frontend</td><td>event row asserted in the service test; History tab renders it</td></tr>
+          <tr><td>New admin screen</td><td>backend gate with <code>AdminUser</code> → <code>features/admin/&lt;x&gt;/</code> → <code>AdminLayout</code> tab → route under <code>AdminRoute</code></td><td>API test for the 403 on member; Vitest for the page from a mocked response</td></tr>
+          <tr><td>New workbook</td><td><code>exporters/</code> builder using the shared row writer → endpoint returning bytes with <code>Content-Disposition</code> → <code>downloadFile</code> button</td><td>open the bytes with openpyxl in the test and assert headers and row counts</td></tr>
+          <tr><td>New config variable</td><td><code>config.py</code> field with default → <code>.env.example</code> line → <code>docker-compose.yml</code> pass-through if needed → <code>DEPLOYMENT.md</code></td><td><code>test_config.py</code>; a v1 <code>.env</code> must still boot (smoke job)</td></tr>
+          <tr><td>New UI text (V2.0 on)</td><td>key in <code>locales/en.json</code> and <code>zh-CN.json</code> → <code>t("ns:key")</code> in the component</td><td>bundle key-parity test; lint rule rejects literal strings</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <ul>
+      <li><strong>Invariants to keep:</strong> routers never touch the session; services never skip the audit row; the schema never uses an engine-specific type; the container never needs a build step on the server.</li>
+      <li><strong>Sources:</strong> <code>docs/superpowers/specs/2026-09-06-joint-cmc-tracker-design.md</code> (v1), the three <code>2026-09-16-v2-*</code> documents, and the phase dev logs under <code>docs/superpowers/logs/</code>.</li>
+    </ul>
+  </section>
+</main>
