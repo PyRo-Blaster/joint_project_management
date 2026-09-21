@@ -3,7 +3,7 @@ from datetime import datetime
 from sqlalchemy import JSON, DateTime, ForeignKey, Index, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.constants import AUDIT_ACTIONS, ENTITY_TYPES
+from app.constants import AUDIT_ACTIONS, ENTITY_TYPES, VIA_SOURCES
 from app.models.base import Base, check_in, utcnow
 
 
@@ -12,6 +12,7 @@ class AuditEvent(Base):
     __table_args__ = (
         check_in("entity_type", ENTITY_TYPES),
         check_in("action", AUDIT_ACTIONS),
+        check_in("via", VIA_SOURCES),
         Index("ix_audit_event_entity", "entity_type", "entity_id"),
     )
 
@@ -24,3 +25,5 @@ class AuditEvent(Base):
     occurred_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow, index=True)
     changes: Mapped[dict] = mapped_column(JSON, default=dict)
     summary: Mapped[str] = mapped_column(String(500))
+    via: Mapped[str] = mapped_column(String(8), default="web", server_default="web")
+    token_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
