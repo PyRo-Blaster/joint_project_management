@@ -14,8 +14,8 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 from app import __version__
 from app.api.router import api_router
 from app.config import get_settings
-from app.mcp import mcp_asgi_app
 from app.constants import CSRF_HEADER, CSRF_VALUE, REQUEST_ID_HEADER
+from app.mcp import mcp_asgi_app
 from app.schemas.common import fail
 from app.services.errors import DomainError
 

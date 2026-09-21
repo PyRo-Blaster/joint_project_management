@@ -124,6 +124,32 @@ Try one:
 curl -H "Authorization: Bearer cmct_..." http://localhost:8000/api/items
 ```
 
+### Agent access (MCP)
+
+The container also serves a [Model Context Protocol](https://modelcontextprotocol.io)
+endpoint at `/mcp`, so an agent can read the tracker without driving a browser.
+It is **read-only in this release**: nothing it offers changes anything, and
+there is no tool for deleting in any release.
+
+Point a client that speaks streamable HTTP at `http://<host>:8000/mcp/` with
+the header `Authorization: Bearer cmct_...`. A stdio-only client can bridge
+with `npx mcp-remote http://<host>:8000/mcp/ --header "Authorization: Bearer cmct_..."`.
+
+| Tool | What it answers |
+|---|---|
+| `cmc_whoami` | Who this token acts as, and what it may do |
+| `cmc_list_vocabulary` | Every valid group, category, status, priority, org, and person |
+| `cmc_search_items` | Find items, one compact line each |
+| `cmc_get_item` | The full record of one item, with recent updates |
+| `cmc_list_updates` | One item's dated timeline |
+| `cmc_get_item_history` | Who changed what on an item, old value to new |
+| `cmc_needs_attention` | Overdue, due soon, and stale items |
+| `cmc_list_activity` | Recent changes across the programme |
+
+The resource `cmc://program/briefing` carries the conventions both teams
+follow; an agent should read it once. Set `MCP_ENABLED=false` to stop serving
+the endpoint entirely.
+
 ## Frontend
 
 The UI is a Vite + React + TypeScript + Tailwind app under `frontend/`, built into
