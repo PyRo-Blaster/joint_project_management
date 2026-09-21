@@ -8,6 +8,7 @@ from sqlalchemy.engine import Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import get_settings
+from app.services.principal import CLI, set_principal
 
 _state: dict[str, object] = {}
 
@@ -57,8 +58,9 @@ def get_db() -> Iterator[Session]:
 
 @contextmanager
 def session_scope() -> Iterator[Session]:
-    """Context manager for CLI and bootstrap code paths."""
+    """Context manager for CLI and bootstrap code paths. Attributed as `cli`."""
     session = get_session_factory()()
+    set_principal(session, CLI)
     try:
         yield session
     finally:

@@ -54,10 +54,13 @@ def db(engine) -> Session:
 
 
 @pytest.fixture
-def cli_db(engine):
-    """Point the process-wide session factory (used by CLI and bootstrap) at the test engine."""
+def cli_db(engine, db):
+    """Point the process-wide session factory (used by CLI and bootstrap) at the test engine.
+
+    Yields a session on the same engine so tests can assert on what the CLI wrote.
+    """
     app_db.configure_engine(str(engine.url))
-    yield
+    yield db
     app_db.reset_state()
 
 
