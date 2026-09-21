@@ -128,6 +128,20 @@ def get_item(
     return item
 
 
+def get_item_by_entry_no(db: Session, program_id: int, entry_no: int) -> ActionItem:
+    """Look an item up by the number both teams cite, not the internal id."""
+    item = db.scalar(
+        select(ActionItem).where(
+            ActionItem.program_id == program_id,
+            ActionItem.entry_no == entry_no,
+            ActionItem.deleted_at.is_(None),
+        )
+    )
+    if item is None:
+        raise NotFoundError(f"No item #{entry_no}")
+    return item
+
+
 def next_entry_no(db: Session, program_id: int) -> int:
     stmt = select(func.max(ActionItem.entry_no)).where(ActionItem.program_id == program_id)
     return (db.scalar(stmt) or 0) + 1

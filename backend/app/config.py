@@ -23,6 +23,8 @@ class Settings(BaseSettings):
     session_ttl_hours: int = 72
     invite_ttl_days: int = 7
     mcp_token_ttl_days: int = 90
+    mcp_enabled: bool = True
+    mcp_allowed_hosts: str = ""
     due_soon_days: int = 14
     stale_days: int = 14
     login_attempts_per_minute: int = 5
