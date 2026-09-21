@@ -17,6 +17,11 @@ down_revision: str | None = "0001"
 branch_labels: str | Sequence[str] | None = None
 depends_on: str | Sequence[str] | None = None
 
+ENTITY_TYPES_0001 = "entity_type IN ('item', 'user', 'invitation', 'vocab_term', 'import')"
+ENTITY_TYPES_0002 = (
+    "entity_type IN ('item', 'user', 'invitation', 'vocab_term', 'import', 'api_token')"
+)
+
 
 def upgrade() -> None:
     op.create_table(
@@ -56,10 +61,21 @@ def upgrade() -> None:
         )
         batch.add_column(sa.Column("token_name", sa.String(length=100), nullable=True))
         batch.create_check_constraint("via_in", "via IN ('web', 'mcp', 'cli')")
+        # 0001 pinned entity_type to a list that predates api_token. alembic check
+        # cannot see CHECK constraint drift, so it has to be rebuilt explicitly.
+        batch.drop_constraint(op.f("ck_audit_event_entity_type_in"), type_="check")
+        batch.create_check_constraint("entity_type_in", ENTITY_TYPES_0002)
 
 
 def downgrade() -> None:
+    # Rolling back drops api_token entirely, so its audit rows describe an entity that
+    # no longer exists and the restored 0001 constraint would reject them. Removing
+    # them is part of the rollback, not an edit to a live trail.
+    op.execute("DELETE FROM audit_event WHERE entity_type = 'api_token'")
+
     with op.batch_alter_table("audit_event") as batch:
+        batch.drop_constraint(op.f("ck_audit_event_entity_type_in"), type_="check")
+        batch.create_check_constraint("entity_type_in", ENTITY_TYPES_0001)
         batch.drop_constraint(op.f("ck_audit_event_via_in"), type_="check")
         batch.drop_column("token_name")
         batch.drop_column("via")

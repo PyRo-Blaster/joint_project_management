@@ -152,10 +152,6 @@ def export_excel(out: Annotated[Path, typer.Argument(dir_okay=False)]) -> None:
     typer.echo(f"wrote {out}")
 
 
-if __name__ == "__main__":
-    cli()
-
-
 token_cli = typer.Typer(help="Manage API tokens for agents", no_args_is_help=True)
 cli.add_typer(token_cli, name="token")
 
@@ -233,3 +229,7 @@ def token_revoke(
         except DomainError as exc:
             raise typer.BadParameter(exc.message) from exc
         typer.echo(f"Revoked '{token.name}' ({prefix})")
+
+
+if __name__ == "__main__":
+    cli()
