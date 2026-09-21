@@ -91,8 +91,38 @@ uv run python -m app.cli export-excel out.xlsx
 
 - Every JSON response is `{success, data, error, meta}`.
 - Mutating requests must send `X-Requested-With: fetch`.
-- Authentication is a session cookie set by `POST /api/auth/login`.
+- Authentication is a session cookie set by `POST /api/auth/login`, or an API
+  token sent as `Authorization: Bearer cmct_...`.
 - OpenAPI: `/api/docs`.
+
+### API tokens
+
+An API token lets a script or an agent use the API without a browser. It belongs
+to a real user and acts as that person, so the permission model and the audit
+trail are unchanged; every change it makes is recorded with its source and the
+token's name, which the activity feed and item history show.
+
+- **Scopes.** A token is `read`, or `read,write`. A read token is refused on any
+  mutating request. There is no admin scope.
+- **Managing tokens** needs a browser session, at **API tokens** in the sidebar.
+  A token can never create or revoke another, so it cannot escalate itself.
+  Members manage their own; admins see everyone's.
+- **The raw value is shown once** at creation and only its first 12 characters
+  are stored in a readable form. Lost tokens are revoked and replaced, not
+  recovered.
+- **Revoking is immediate.** Deactivating a user disables their tokens too.
+
+```bash
+uv run python -m app.cli token create someone@example.com --name "Claude Code" --scopes read,write
+uv run python -m app.cli token list
+uv run python -m app.cli token revoke cmct_abc1234
+```
+
+Try one:
+
+```bash
+curl -H "Authorization: Bearer cmct_..." http://localhost:8000/api/items
+```
 
 ## Frontend
 
