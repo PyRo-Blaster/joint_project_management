@@ -29,7 +29,8 @@ service layer as the UI, and the audit row says *who* authorised it and
 | Language | Python, official `mcp` SDK (FastMCP), in `backend/app/mcp/` | Same container, same dependency tree, same tests. A Node process in this image would break the single-process model. |
 | Auth | **Bearer API tokens** scoped to a user, new `api_token` table | Session cookies are for browsers. An agent needs a long-lived, revocable, scoped credential that is not a password. |
 | Identity | Every token belongs to a **real user**; the agent acts as that person | Keeps the permission model, the audit trail, and accountability unchanged. No "robot" accounts with ambiguous ownership. |
-| Write boundary | **Append applies, overwrite proposes, delete does not exist** (§7) | Creating an item and posting an update add information and destroy none, so they run unattended. Changing a field overwrites what a person wrote, so a person confirms it. Deleting has no tool at all. |
+| Write boundary | **Append applies, edits confirm in-conversation, delete does not exist** (§7) | Additive work runs unattended. An edit is previewed and confirmed in the same conversation, then stays undoable for 14 days. No approval queue, no second inbox. |
+| Editable surface | An agent may change an item's **live state**, never its **identity** (§7.2) | Title, group, owner org and kind are not tool parameters at all, so they need no guarding. |
 | Destructive tools | **No tool exists** — no delete, no restore, no user admin, no vocabulary, no import | An absent door beats a guarded one. These stay in the web UI. |
 | Item handle | Tools take **`entry_no`** (the number both teams already say out loud), return both `entry_no` and `id` | "#42" is the shared vocabulary; the internal id is an implementation detail. |
 
@@ -89,7 +90,7 @@ tokens already use. Shown **once** at creation, never retrievable again.
 | Scope | Grants |
 |---|---|
 | `read` | every read tool |
-| `write` | the write tools, subject to the token's write mode (§7.4) — `append` applies directly, `propose` creates proposals a person approves |
+| `write` | the write tools, subject to the token's write mode (§7.6) — `append` is additive only, `interactive` adds edits behind the confirm handshake |
 
 `admin` is deliberately **not** a scope. Admin capabilities (users, vocab,
 import, restore) have no MCP tools, so no token can reach them. A member's
@@ -164,21 +165,21 @@ client's tool list. Every tool returns compact text for the model plus
 
 ### 6.2 Write tools
 
-Split by the approval boundary in §7. **Open** tools apply immediately.
-**Gated** tools create a proposal a person approves in the web UI.
+Split by the boundary in §7. **Open** tools apply immediately. **Confirm**
+tools return a diff and a token on the first call and apply on the second,
+so the person approves in the conversation they are already having.
 
 | Tool | Gate | Input | Behaviour |
 |---|---|---|---|
 | `cmc_post_update` | **open** | `entry_no`, `body`, `occurred_on` (default today) | Appends a dated timeline entry. Append-only, attributed, destroys nothing — the same shape as creating an item, and the most common agent action. |
 | `cmc_create_item` | **open** | `title`, `group`, `owner_org`, the optional rest, `kind`, `idempotency_key`, `confirm_new` | Creates an item. Runs a near-duplicate check first (§7.3) and refuses on a close title match unless `confirm_new=true`. Marked unreviewed until a person opens it. |
-| `cmc_set_status` | **gated** | `entry_no`, `status`, `note`, `rationale`, `expected_updated_at` | Proposes a status change. Configurable to open per token once the team trusts it (§7.4) — the first candidate for promotion. |
-| `cmc_update_item` | **gated** | `entry_no`, any patchable field, `rationale`, `expected_updated_at` | Proposes a field change. Overwrites text a person wrote, so it always needs a human. |
-| `cmc_apply_batch` | **mixed** | `changes[]`, `dry_run` (default **true**) | One transaction for a set of changes. Open changes apply, gated ones become proposals, and the result says which did what. |
+| `cmc_set_status` | **confirm** | `entry_no`, `status`, `note`, `confirm` | Returns the diff and a confirm token; the second call applies it. |
+| `cmc_update_item` | **confirm** | `entry_no`, any of `due_on`, `priority`, `category`, `assignee`, `details`, `notes_risks`, `file_path`, `confirm` | Same handshake. Title, group, owner org and kind are **not parameters** (§7.2). |
+| `cmc_apply_batch` | **confirm** | `changes[]`, `confirm` | One transaction for a set of changes: the first call previews all of them and returns a single token covering the set, the second applies them all or none. |
 
-Every write tool takes `dry_run` and returns the exact diff it would
-produce. Gated tools additionally take `rationale`, a short sentence shown
-to the approver — an agent that cannot explain a change in one line
-probably should not be making it.
+The open tools take `dry_run` and return the diff they would produce. The
+confirm tools *are* a dry run on their first call, so the two ideas
+collapse: call without `confirm` to see the diff, call with it to apply.
 
 Annotations: all write tools are `readOnlyHint: false`,
 `destructiveHint: false`, `idempotentHint: false` except `cmc_set_status`,
@@ -205,137 +206,167 @@ restore (it reverses a human's deliberate delete), vocabulary (renaming a
 term rewrites every item carrying it), and import (it can create dozens of
 rows at once).
 
-## 7. The approval boundary
+## 7. The approval mechanism
 
-### 7.1 The line is append versus overwrite
+### 7.1 Why the queue was the wrong shape
 
-The intuitive split is "reading and adding are safe, editing and deleting
-are not." That is nearly right, and it puts one important action on the
-wrong side.
+The first draft of this design gated edits behind a `pending_change`
+queue: the agent proposes, a person finds the proposal in the app and
+approves it. It is the obvious answer and it is more machinery than the
+problem deserves.
 
-**Posting a timeline update is an append, not an edit.** It adds a dated,
-attributed paragraph and destroys nothing — the same shape as creating an
-item. It is also the single most valuable thing an agent can do here: it is
-what the spreadsheet's Status Updates cell always held, and it is the
-action a person most wants automated. Gating it behind approval would cost
-most of the server's usefulness to protect against a risk that does not
-exist, because a wrong update is corrected by posting another one and the
-original stays visible in the timeline.
+A queue is **a second inbox**. Inboxes need notifications to be seen, they
+accumulate stale entries, they need an expiry job, and they need their own
+review screen. Worse, the human loop is asynchronous: the agent finishes
+its turn not knowing whether the change landed, and the person has to
+context-switch into the app later to finish a job they already asked for.
+That is the tedium, and it is in the shape, not the details.
 
-So the boundary is drawn one notch differently:
+Three moves remove almost all of it.
 
-| Tier | Operations | Rule |
-|---|---|---|
-| **Open** | every read, `cmc_create_item`, `cmc_post_update` | Applies immediately. Purely additive: nothing a person wrote is changed or lost. |
-| **Gated** | `cmc_update_item`, `cmc_set_status` | Creates a proposal. A person approves or rejects it in the web UI. |
-| **Absent** | delete, restore, users, vocabulary, import | No tool exists. |
+### 7.2 Move one — shrink what an agent can edit
 
-`cmc_set_status` is the debatable one. It is fully reversible and fully
-audited, which argues for open; but status is what both teams steer by on
-the board and the dashboard, so a wrong one misleads people before anyone
-notices. It starts gated and can be promoted per token (§7.4).
+Most of the machinery existed to guard fields that an agent has no business
+touching in the first place. Not exposing them is simpler than guarding
+them, and it is the same reasoning that removed the delete tool.
 
-Clearing a field counts as overwriting, so blanking a due date or emptying
-the notes column is gated like any other edit.
+| Agent-editable | Never agent-editable |
+|---|---|
+| `status`, `due_on`, `priority`, `category`, `assignee`, `details`, `notes_risks`, `file_path` | `title`, `group`, `owner_org`, `kind`, `entry_no` |
 
-### 7.2 How approval works
+The right column is the item's identity and its accountability. `title` is
+how both teams refer to the item in email and minutes; `owner_org` and
+`group` assign work between two companies; `kind` and `entry_no` are
+structural. Those change in the web UI, by a person, deliberately.
 
-The gated tools do not apply a change. They write a **`pending_change`**
-row and return "proposed, awaiting approval" with the diff and a link.
+The left column is the item's live state — the things that legitimately
+move week to week, and precisely what an agent is useful for. Every one of
+them is a single value that is obvious when wrong and trivial to correct.
 
-- A person sees pending proposals in three places: a count on the
-  dashboard, a badge on the item in the table and board, and a card on the
-  item detail sheet showing the diff, the agent's rationale, and the token
-  that proposed it.
-- Approve applies the change through the normal service call, so the audit
-  row records the **approver** as the actor with `via = mcp_approved` and
-  the proposing token's name alongside. Accountability lands on the human
-  who said yes, which is the point.
-- Reject records the decision and an optional reason. Both outcomes are
-  audited.
-- A proposal expires after `PENDING_CHANGE_TTL_DAYS` (7) so the queue
-  cannot silently accumulate.
-- If the item changed after the proposal was computed, the proposal is
-  marked **stale**; approving it shows the new diff and requires a second
-  confirmation, so an agent's week-old edit can never quietly clobber
-  yesterday's work.
+### 7.3 Move two — confirm in the conversation, not in a queue
 
-**One dependency to be honest about.** V2.0 has no notifications, so a
-proposal is only seen when someone opens the app. Both teams look at the
-dashboard daily, and the expiry keeps stale proposals from piling up, so
-this is workable — but if agent use grows, emailed proposal alerts become
-the first thing worth adding from the V2.x backlog.
+The person who should approve an agent's edit is almost always **already in
+the conversation with it**. Sending them to a queue in another application
+to approve a change they just asked for is the tedium. So the confirmation
+happens where they are, in a two-call handshake:
 
-**A policy question for the team.** Any member can approve, since v1 §6
-already lets both orgs edit everything. Whether the token's own owner may
-approve their own agent's proposal is a choice: allowing it is the normal,
-convenient case (you asked the agent to do it, you confirm it did it
-right); forbidding it via `PENDING_CHANGE_SELF_APPROVE=false` gives true
-four-eyes separation at the cost of needing a second person for every edit.
-Recommendation: allow it, and revisit if an auditor asks otherwise.
+1. The agent calls `cmc_update_item(entry_no=42, due_on="2026-11-15")`.
+   The server changes nothing and returns the exact diff plus a
+   **confirm token**:
+   `due_on: 2026-10-01 → 2026-11-15. Confirm with confirm="ct_…" (valid 10 minutes).`
+2. The agent shows the diff and asks. The person says yes.
+3. The agent calls again with `confirm`, and the change applies.
 
-### 7.3 What keeps open creates safe
+**The token is stateless** — an HMAC over the item id, the canonical patch,
+the item's `updated_at` at step 1, and an expiry, signed with the existing
+`SECRET_KEY`. Nothing is stored, so there is no table, no state machine,
+no expiry job to sweep.
 
-Leaving creates open is the right call — it is what makes the
-meeting-minutes flow work — but "additive" is not the same as "harmless"
-here, for two reasons worth guarding.
+It also gives three things free:
 
-**Duplicates are the real risk.** An agent that files "Stability protocol
-review" when #31 already covers it creates silent drift: two rows, two
-owners, two timelines for one commitment. That is arguably worse than a bad
-edit, because an edit shows up in history and a duplicate shows up nowhere.
-So `cmc_create_item` searches active items for a close title match first
-and refuses on a strong hit, naming the candidate and asking the agent to
-either post an update on the existing item or pass `confirm_new=true`.
+- **Staleness detection.** The base `updated_at` is signed into the token,
+  so if someone edited the item between the two calls, the confirm fails
+  with the new diff. The optimistic-concurrency guardrail disappears into
+  this step rather than being its own mechanism.
+- **Tamper resistance.** The patch is signed, so the agent cannot confirm a
+  change different from the one it previewed.
+- **A free second prompt.** Because both calls are annotated non-read-only,
+  clients that confirm such calls prompt the operator anyway.
+
+### 7.4 Move three — Undo instead of approval for catching mistakes
+
+Steps 7.2 and 7.3 handle "is this the right change". What remains is "the
+agent and I both got it wrong", and for that **reversal beats prevention**.
+
+Every agent change is flagged on the item and reversible in one click for
+`AGENT_UNDO_DAYS` (14):
+
+- The item detail sheet shows a slim bar: *"Agent changed due date
+  2026-10-01 → 2026-11-15, 2 hours ago, via Alice's Claude Code.
+  [Undo] [Looks right]"*
+- The dashboard shows *"4 agent changes awaiting your eye"* linking to the
+  filtered list.
+- Acknowledging is one click, and happens implicitly when a person edits
+  the item themselves.
+
+**Undo needs no new storage either.** The audit event already stores
+`{field: {old, new}}`, so reversing is building the inverse patch and
+applying it through the normal service call. It lands as an ordinary
+audited event with action `reverted`, roughly thirty lines of service code
+— and it is independently useful for human mistakes, which the app cannot
+do today at all.
+
+For a regulated change history this is arguably *better* than a queue. An
+approved-or-rejected proposal leaves the rejected version nowhere; a change
+and its reversal both sit in the trail, which is exactly what a change
+history is supposed to show.
+
+### 7.5 What about agents with nobody watching?
+
+A scheduled or headless agent has no one to confirm with, which is the one
+case a queue genuinely solved. The simpler answer is that the correct
+response to "nobody is watching" is **no**, not "ask someone later".
+
+Headless agents get a token in `append` mode: they can post updates and
+create items — the additive work that needs no supervision — and they
+cannot edit at all. If the team later wants unattended edits, that is the
+moment to revisit a queue, with real usage to justify it.
+
+### 7.6 The resulting mechanism
+
+| Operation | Mechanism |
+|---|---|
+| Every read | Direct |
+| `cmc_post_update`, `cmc_create_item` | Direct, plus the create guardrails in §7.7 |
+| `cmc_set_status`, `cmc_update_item` (editable fields only) | Preview → confirm token → apply, then flagged and undoable for 14 days |
+| Title, group, owner org, kind | No tool parameter exists |
+| Delete, restore, users, vocabulary, import | No tool exists |
+| Anything at all, headless | `append` mode: additive only |
+
+Per-token write modes reduce to three: `read_only`, `append`, and
+`interactive` (the default — append applies, edits need the confirm
+handshake). `MCP_WRITES_ENABLED=false` is still the global kill switch.
+
+What this removed, relative to the queue design: one table with a state
+machine, three endpoints, a review screen with diff cards, an expiry job,
+the staleness logic, the self-approval policy question, and three config
+variables. What it added: one undo endpoint, one banner, one dashboard
+tile, and an HMAC helper. It is roughly a third of the work, and the person
+never leaves the conversation to finish a change they asked for.
+
+### 7.7 What keeps open creates safe
+
+Unchanged from the previous draft, because it was already cheap and it
+guards the one real risk of unattended creates.
+
+**Duplicates are the risk, not junk.** An agent that files "Stability
+protocol review" when #31 already covers it creates silent drift: two rows,
+two owners, two timelines for one commitment. An edit shows up in history;
+a duplicate shows up nowhere. So `cmc_create_item` searches active items
+for a close title match and refuses a strong hit, naming the candidate and
+asking the agent to either post an update on it or pass `confirm_new=true`.
 
 **Entry numbers are permanent.** `entry_no` is max+1 and both teams cite it
-in email and minutes. A junk item consumes a number even after it is
-soft-deleted. The duplicate check and the idempotency key together make
-accidental consumption unlikely, and that is the right level of effort —
-protecting it further is not worth gating creates.
+in email and minutes; a junk item consumes a number even after a soft
+delete. The duplicate check plus the idempotency key make that unlikely
+enough, and that is the right level of effort.
 
-**Review after the fact, not approval before it.** Agent-created items
-carry a "raised by agent, unreviewed" chip until a person opens or edits
-them, and the dashboard lists them under needs-attention. This gives the
-visibility an approval queue would give, at a fraction of the cost, without
-blocking the flow that makes the feature worth having.
+**Review after, not approval before.** Agent-created items carry an
+"unreviewed" chip and sit on the dashboard list until a person opens them —
+the same surface as the undo bar in §7.4, so there is one place to look,
+not two.
 
-### 7.4 Per-token posture
-
-Each token carries a **write mode**, so the boundary can be tightened or
-relaxed per agent without code changes:
-
-| Mode | Effect |
-|---|---|
-| `read_only` | no write tools at all |
-| `append` | open tier only: create and post update |
-| `propose` | **default** — append tier applies, gated tier proposes |
-| `direct_status` | as `propose`, but status changes apply immediately |
-
-`direct_status` is how `cmc_set_status` gets promoted for a trusted agent
-once the team has seen it behave, without opening field edits. There is
-deliberately no mode that applies `cmc_update_item` without a human.
-
-`MCP_WRITES_ENABLED=false` remains the global kill switch across all modes.
-
-### 7.5 The other guardrails
-
-These apply across both tiers and are unchanged from the original design:
+### 7.8 The remaining guardrails
 
 1. **`dry_run` on every write**, returning the exact diff and changing
-   nothing. `cmc_apply_batch` defaults to a preview.
-2. **Optimistic concurrency** via `expected_updated_at`, so a stale write
-   fails with a conflict and the current item rather than overwriting a
-   colleague.
-3. **Idempotency keys** on create, so a retry after a timeout cannot file
+   nothing. For edits this is what the first handshake call already does,
+   so the two collapse into one idea.
+2. **Idempotency keys** on create, so a retry after a timeout cannot file
    entry 58 twice.
-4. **Per-token rate limits**, 60 writes and 600 reads per minute.
-5. **Client-side prompts.** Because every write tool is annotated
-   non-read-only, MCP clients that confirm such calls will also prompt the
-   operator. This is free and worth having, but it is not the approval
-   mechanism: it depends on client configuration, the operator can disable
-   it, and it does not apply to headless agents. Server-side proposals are
-   what actually enforce the boundary.
+3. **Per-token rate limits**, 60 writes and 600 reads per minute.
+4. **Client-side prompts**, free from the non-read-only annotations.
+5. **Everything attributed**: `via` and `token_name` on every audit row, so
+   the Audit log answers "what did the agents change" in one filter.
 
 ## 8. Errors, context, and conventions
 
@@ -376,15 +407,17 @@ Migration `0003` (after V2.0's `0002`), additive and engine-neutral:
 | Table | Change |
 |---|---|
 | `api_token` | new (unique `token_hash`; index on `user_id`); includes `write_mode` |
-| `pending_change` | new — `program_id`, `item_id`, `kind` (`item_patch`\|`status_change`), `payload` JSON, `rationale`, `base_updated_at`, `proposed_by`, `token_name`, `state` (`pending`\|`applied`\|`rejected`\|`expired`), `decided_by`, `decided_at`, `decision_note`, `expires_at`; index on `(program_id, state)` |
-| `audit_event` | + `via` (str(16), default `web`; `mcp`, `mcp_approved`, `cli`, `import`), + `token_name` (str(100), nullable) |
-| `action_item` | + `idempotency_key` (str(64), nullable, unique per program), + `agent_reviewed_at` (datetime, nullable — null on an agent-created item until a person opens or edits it) |
+| `audit_event` | + `via` (str(16), default `web`; `mcp`, `cli`, `import`), + `token_name` (str(100), nullable), + `reverted_by_event_id` (int, nullable) |
+| `action_item` | + `idempotency_key` (str(64), nullable, unique per program), + `agent_ack_at` / `agent_ack_by` (nullable — set when a person acknowledges or edits after an agent touched the item) |
 
-New endpoints for the queue: `GET /pending-changes` (filters: state, item,
-proposer), `POST /pending-changes/{id}/approve`, `POST
-/pending-changes/{id}/reject`. Approval calls the same service the UI
-calls, so the applied change is audited normally with the approver as
-actor.
+No table for proposals: the confirm token is a stateless HMAC and undo
+reads the audit row it reverses.
+
+One new endpoint, `POST /activity/{event_id}/revert`, which builds the
+inverse patch from the event's `changes` and applies it through the normal
+service call, recording a `reverted` event that points back. Plus `POST
+/items/{id}/ack` for the one-click "looks right". Both are ordinary member
+capabilities, not admin.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -394,9 +427,9 @@ actor.
 | `MCP_RATE_WRITES_PER_MIN` | `60` | per token |
 | `MCP_RATE_READS_PER_MIN` | `600` | per token |
 | `IDEMPOTENCY_TTL_HOURS` | `24` | create-retry window |
-| `MCP_DEFAULT_WRITE_MODE` | `propose` | write mode for a new token |
-| `PENDING_CHANGE_TTL_DAYS` | `7` | a proposal expires unreviewed |
-| `PENDING_CHANGE_SELF_APPROVE` | `true` | may a token's owner approve their own agent's proposal (§7.2) |
+| `MCP_DEFAULT_WRITE_MODE` | `interactive` | write mode for a new token |
+| `MCP_CONFIRM_TTL_MINUTES` | `10` | confirm-token validity |
+| `AGENT_UNDO_DAYS` | `14` | how long an agent change stays one-click reversible |
 
 One new backend dependency: `mcp` (the official Python SDK), pinned. Read
 its README at implementation time rather than from memory — the ASGI
@@ -432,19 +465,19 @@ Five tasks, a little over one v1 phase in total, on branch
    dashboard list, `dry_run`, and the `via` and `token_name` audit fields
    flowing through. **This is the release that delivers most of the value**
    — updating entries and filing new ones, unattended, fully audited.
-4. **Approval queue and gated writes.** `pending_change`, the approve and
-   reject endpoints, the dashboard count, the item badge and diff card,
-   expiry and staleness, then `cmc_update_item` and `cmc_set_status` on top
-   of it, plus `cmc_apply_batch` spanning both tiers.
+4. **Edits with confirm and undo.** The HMAC confirm helper, `cmc_set_status`
+   and `cmc_update_item` over the narrowed field set, `cmc_apply_batch`, the
+   revert service and endpoint, the agent-change bar on the item, and the
+   dashboard tile. The undo half is independently useful: it is the first
+   time anyone, agent or human, can reverse a change from the UI.
 5. **Export and hardening.** `cmc_export_workbook` with signed URLs, the
    evaluation suite (§11), docs, and the tagged release.
 
-Two sequencing calls matter here. **Read-only first** de-risks the tool
-design against real agents at zero blast radius. **Open writes before the
-approval queue** means the team gets the valuable half early and can decide
-from experience whether the queue in step 4 is worth building, or whether
-field edits should simply stay in the web UI. If they choose the latter,
-step 4 shrinks to nothing and the design still holds.
+Two sequencing calls matter. **Read-only first** de-risks the tool design
+against real agents at zero blast radius. **Open writes before edits** means
+the team gets the valuable half early, and step 4 remains optional: if
+posting updates and filing items turns out to be enough, field edits can
+simply stay in the web UI and nothing else in the design changes.
 
 ## 11. Testing and evaluation
 
@@ -456,10 +489,15 @@ Beyond the project's existing layers:
 - **Scope and auth tests**: a `read` token is refused on every write tool; a
   deactivated user's token is refused everywhere; a revoked token is refused
   immediately; an expired token names its expiry.
-- **Guardrail tests**: `dry_run` mutates nothing (asserted by comparing the
-  full table state before and after); a stale `expected_updated_at` raises
-  conflict; a repeated idempotency key returns the original item and creates
-  no second row; a batch with one bad change commits nothing.
+- **Guardrail tests**: a first-call preview mutates nothing (asserted by
+  comparing full table state before and after); a confirm token for a
+  changed item is refused; a tampered or expired token is refused; a
+  repeated idempotency key returns the original item and creates no second
+  row; a batch with one bad change commits nothing.
+- **Undo tests**: reverting an event restores every field it changed and
+  only those, records a `reverted` event pointing at the original, works on
+  a human's change as well as an agent's, and refuses twice on the same
+  event.
 - **Protocol smoke** with the MCP Inspector against a running container,
   plus a CI job that lists tools over streamable HTTP and calls `cmc_whoami`
   with a seeded token.
@@ -474,10 +512,12 @@ Beyond the project's existing layers:
 
 | Risk | Mitigation |
 |---|---|
-| An agent overwrites something a person wrote | It cannot: field and status changes are proposals a person approves, and the audit row names the approver |
+| An agent overwrites something a person wrote | It cannot touch the item's identity at all (§7.2); a live-state edit is previewed, confirmed in the conversation, flagged on the item, and one click to reverse for 14 days |
+| A confirm token is replayed or tampered with | It is an HMAC over the item, the exact patch and the base version, valid ten minutes and single-use in effect: a changed item invalidates it |
 | An agent files a duplicate or junk item | Near-duplicate check refuses close title matches; idempotency keys stop retry doubles; agent-created items are chipped unreviewed and listed on the dashboard |
-| A proposal sits unseen because there are no notifications | Dashboard count, item badge, and a 7-day expiry; emailed alerts are the first V2.x item to pull in if agent use grows |
-| Approval becomes a rubber stamp | The diff and the agent's rationale are shown, not just a yes button; stale proposals force a second confirmation against the current item |
+| The person confirms without really reading the diff | Unavoidable in any design; undo is the backstop, and the change plus its reversal both stay in the audit trail, which a rejected proposal would not |
+| An agent change is never noticed | The item bar and the dashboard tile persist until someone acknowledges; unlike a queue there is no expiry that quietly drops it |
+| A headless agent makes an unsupervised edit | It cannot: `append` mode has no edit tools at all |
 | A token leaks | Hashed at rest, prefix-identifiable, revocable instantly, expiring by default, scoped to one user's own permissions, and `MCP_WRITES_ENABLED=false` disables all writes at once |
 | Agents flood the database | Per-token rate limits, hard page caps, and the same single-container profile the UI already runs in |
 | Tool surface churn breaks clients | Tool names and required arguments are treated as an API: additive changes only within a major version, and `cmc_whoami` reports the server version |
@@ -486,7 +526,7 @@ Beyond the project's existing layers:
 
 ## 13. Acceptance
 
-- An admin mints a `read,write` token in `propose` mode for a member; the
+- An admin mints a `read,write` token in `interactive` mode for a member; the
   raw token is shown once and never again, and the listing shows only its
   prefix.
 - An agent with that token calls `cmc_whoami` and gets the member's name,
@@ -499,20 +539,24 @@ Beyond the project's existing layers:
   an "unreviewed" chip and on the dashboard's needs-attention list until a
   person opens it. Filing a near-identical title instead returns the
   existing entry number and refuses without `confirm_new`.
-- **Gated path:** the agent proposes a due-date change. Nothing changes on
-  the item. A count appears on the dashboard, a badge on the item, and the
-  detail sheet shows the diff plus the agent's rationale. Approving applies
-  it and audits the **approver** as the actor; rejecting records the
-  decision. Both are visible in the Audit log filtered by source.
-- A proposal whose item changed in the meantime is flagged stale and
-  requires a second confirmation showing the new diff.
-- A token in `append` mode is refused on the gated tools with a message
+- **Confirm path:** the agent calls to move a due date. Nothing changes;
+  it gets the diff and a token. It shows the diff, the person says yes, the
+  second call applies it — all inside one conversation, with no visit to
+  another screen.
+- If someone edits the item between the two calls, the confirm fails and
+  returns the new diff rather than applying a stale change.
+- **Undo path:** the item shows an agent-change bar with the diff and the
+  token name; the dashboard counts it. One click reverses it, recording a
+  `reverted` event that points at the original. One click acknowledges it
+  instead, and the bar clears.
+- `cmc_update_item` has no parameter for title, group, owner org, or kind;
+  attempting one is a schema error naming the web UI as the place to do it.
+- A token in `append` mode is refused on the edit tools with a message
   naming its mode; a `read` token is refused on every write.
 - No tool exists for delete, restore, users, vocabulary, or import — the
   agent's tool list simply does not contain them.
-- `cmc_apply_batch` with six changes returns a preview by default; run for
-  real it applies the open ones and queues the gated ones, and says which
-  did what.
+- `cmc_apply_batch` with six changes returns one preview and one token;
+  confirming applies all six or none.
 - Revoking the token stops the next call immediately; `MCP_WRITES_ENABLED=false`
   stops all writes while leaving reads working.
 - `docker compose up -d` from a V2.0 volume serves `/mcp` with no new
