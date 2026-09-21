@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent, User
+from app.services.principal import current_principal
 
 ActivityRow = tuple[AuditEvent, User]
 
@@ -40,6 +41,7 @@ def record_event(
     program_id: int | None = None,
 ) -> AuditEvent:
     """Add an audit row to the session. The caller commits, so the event shares the transaction."""
+    principal = current_principal(db)
     event = AuditEvent(
         program_id=program_id,
         entity_type=entity_type,
@@ -48,6 +50,8 @@ def record_event(
         actor_id=actor.id,
         changes=dict(changes or {}),
         summary=summary[:500],
+        via=principal.via,
+        token_name=principal.token_name,
     )
     db.add(event)
     return event
