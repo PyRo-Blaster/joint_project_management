@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     initial_import_overrides: str = "{}"
     session_ttl_hours: int = 72
     invite_ttl_days: int = 7
+    mcp_token_ttl_days: int = 90
     due_soon_days: int = 14
     stale_days: int = 14
     login_attempts_per_minute: int = 5
