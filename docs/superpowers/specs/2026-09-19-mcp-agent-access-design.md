@@ -29,7 +29,8 @@ service layer as the UI, and the audit row says *who* authorised it and
 | Language | Python, official `mcp` SDK (FastMCP), in `backend/app/mcp/` | Same container, same dependency tree, same tests. A Node process in this image would break the single-process model. |
 | Auth | **Bearer API tokens** scoped to a user, new `api_token` table | Session cookies are for browsers. An agent needs a long-lived, revocable, scoped credential that is not a password. |
 | Identity | Every token belongs to a **real user**; the agent acts as that person | Keeps the permission model, the audit trail, and accountability unchanged. No "robot" accounts with ambiguous ownership. |
-| Destructive tools | **Not exposed in V2.1** — no delete, no restore, no user admin, no import | The blast radius of an agent mistake on a regulated tracker is the thing to control first. Those stay in the web UI. |
+| Write boundary | **Append applies, overwrite proposes, delete does not exist** (§7) | Creating an item and posting an update add information and destroy none, so they run unattended. Changing a field overwrites what a person wrote, so a person confirms it. Deleting has no tool at all. |
+| Destructive tools | **No tool exists** — no delete, no restore, no user admin, no vocabulary, no import | An absent door beats a guarded one. These stay in the web UI. |
 | Item handle | Tools take **`entry_no`** (the number both teams already say out loud), return both `entry_no` and `id` | "#42" is the shared vocabulary; the internal id is an implementation detail. |
 
 ## 3. Architecture
@@ -88,7 +89,7 @@ tokens already use. Shown **once** at creation, never retrievable again.
 | Scope | Grants |
 |---|---|
 | `read` | every read tool |
-| `write` | create item, update item, set status, post update, apply batch |
+| `write` | the write tools, subject to the token's write mode (§7.4) — `append` applies directly, `propose` creates proposals a person approves |
 
 `admin` is deliberately **not** a scope. Admin capabilities (users, vocab,
 import, restore) have no MCP tools, so no token can reach them. A member's
@@ -163,13 +164,26 @@ client's tool list. Every tool returns compact text for the model plus
 
 ### 6.2 Write tools
 
-| Tool | Input | Behaviour | Annotations |
+Split by the approval boundary in §7. **Open** tools apply immediately.
+**Gated** tools create a proposal a person approves in the web UI.
+
+| Tool | Gate | Input | Behaviour |
 |---|---|---|---|
-| `cmc_post_update` | `entry_no`, `body`, `occurred_on` (default today), `dry_run` | Appends a timeline entry. **The most common agent action** — a dated note of what happened, exactly what the spreadsheet's Status Updates cell used to hold. | not readOnly, not idempotent, not destructive |
-| `cmc_set_status` | `entry_no`, `status`, `note` (optional, posted as an update in the same transaction), `expected_updated_at`, `dry_run` | The second most common action, given its own tool so the agent does not have to reach for a generic patch. Setting `completed` fills `completed_on`. | not readOnly, not destructive |
-| `cmc_update_item` | `entry_no`, any of the patchable fields, `expected_updated_at`, `dry_run` | Partial update, the same `ItemPatch` shape the UI uses. | not readOnly, not destructive |
-| `cmc_create_item` | `title`, `group`, `owner_org`, and the optional rest; `kind` (`action`\|`note`), `idempotency_key`, `dry_run` | Creates an item; `entry_no` is assigned as max+1, same as the UI. | not readOnly, not idempotent |
-| `cmc_apply_batch` | `changes[]` (each an update, status change, or post), `dry_run` (default **true**) | One transaction for a set of changes — the "I read the meeting minutes, apply these six things" case. All-or-nothing. Defaults to a preview. | not readOnly, not destructive |
+| `cmc_post_update` | **open** | `entry_no`, `body`, `occurred_on` (default today) | Appends a dated timeline entry. Append-only, attributed, destroys nothing — the same shape as creating an item, and the most common agent action. |
+| `cmc_create_item` | **open** | `title`, `group`, `owner_org`, the optional rest, `kind`, `idempotency_key`, `confirm_new` | Creates an item. Runs a near-duplicate check first (§7.3) and refuses on a close title match unless `confirm_new=true`. Marked unreviewed until a person opens it. |
+| `cmc_set_status` | **gated** | `entry_no`, `status`, `note`, `rationale`, `expected_updated_at` | Proposes a status change. Configurable to open per token once the team trusts it (§7.4) — the first candidate for promotion. |
+| `cmc_update_item` | **gated** | `entry_no`, any patchable field, `rationale`, `expected_updated_at` | Proposes a field change. Overwrites text a person wrote, so it always needs a human. |
+| `cmc_apply_batch` | **mixed** | `changes[]`, `dry_run` (default **true**) | One transaction for a set of changes. Open changes apply, gated ones become proposals, and the result says which did what. |
+
+Every write tool takes `dry_run` and returns the exact diff it would
+produce. Gated tools additionally take `rationale`, a short sentence shown
+to the approver — an agent that cannot explain a change in one line
+probably should not be making it.
+
+Annotations: all write tools are `readOnlyHint: false`,
+`destructiveHint: false`, `idempotentHint: false` except `cmc_set_status`,
+which is idempotent. Clients that prompt on non-read-only tools therefore
+prompt on all five, which is the free client-side layer described in §7.5.
 
 ### 6.3 Export tool
 
@@ -177,43 +191,151 @@ client's tool list. Every tool returns compact text for the model plus
 |---|---|---|
 | `cmc_export_workbook` | same filters as `cmc_search_items`, plus `kind` (`items`\|`period_report`), `from`, `to` | A **signed, short-lived download URL** and a summary of what it contains — never the bytes. Keeps megabytes of base64 out of the model's context and reuses the V2.0 report builders. |
 
-### 6.4 No tools for
+### 6.4 No tools at all for
 
-Delete, restore, user administration, vocabulary edits, invitations,
-password resets, and Excel import. Each is either destructive, privileged,
-or rare enough that the web UI is the right place. An agent that needs one
-says so; a person does it.
+**Delete and restore**, user administration, vocabulary edits, invitations,
+password resets, and Excel import.
 
-## 7. Guardrails
+Deleting is not gated behind approval — it is absent. There is no tool an
+agent can call, with any token, any scope, or any approval, that removes an
+item. Removing something from a joint regulatory tracker is a decision two
+companies make deliberately in the UI, and an approval prompt is a weaker
+protection than simply not building the door. The same reasoning covers
+restore (it reverses a human's deliberate delete), vocabulary (renaming a
+term rewrites every item carrying it), and import (it can create dozens of
+rows at once).
 
-Five mechanisms, each cheap and each closing a specific failure mode.
+## 7. The approval boundary
 
-1. **`dry_run` on every write.** Returns the exact diff that would be
-   applied — old → new per field — and changes nothing. `cmc_apply_batch`
-   defaults to `dry_run=true`, so the agent must consciously commit a
-   multi-item change. This is the single most valuable guardrail: it lets
-   the agent check its own work, and lets a person approve a preview.
+### 7.1 The line is append versus overwrite
 
-2. **Optimistic concurrency.** `expected_updated_at` on updates. If the
-   item changed since the agent read it, the call fails with `conflict` and
-   returns the current item so the agent can re-read and retry rather than
-   silently overwriting a colleague. This is the V2.x optimistic-locking
-   idea, pulled forward because agents make the race far more likely than
-   two people ever did.
+The intuitive split is "reading and adding are safe, editing and deleting
+are not." That is nearly right, and it puts one important action on the
+wrong side.
 
-3. **Idempotency keys** on `cmc_create_item`. A retry after a timeout must
-   not create entry 58 twice. The key is stored with the item for
-   `IDEMPOTENCY_TTL_HOURS` (24) and a repeat returns the original.
+**Posting a timeline update is an append, not an edit.** It adds a dated,
+attributed paragraph and destroys nothing — the same shape as creating an
+item. It is also the single most valuable thing an agent can do here: it is
+what the spreadsheet's Status Updates cell always held, and it is the
+action a person most wants automated. Gating it behind approval would cost
+most of the server's usefulness to protect against a risk that does not
+exist, because a wrong update is corrected by posting another one and the
+original stays visible in the timeline.
 
-4. **Rate limits per token.** 60 writes per minute, 600 reads per minute,
-   enforced by the same sliding-window limiter the login path uses (moved
-   to a database-backed limiter so it survives multiple workers). A limited
-   call returns `rate_limited` with the retry delay.
+So the boundary is drawn one notch differently:
 
-5. **Validation before the model sees a failure.** Every enum error names
-   the valid values in the message, and every unknown group or category
-   suggests the closest active term. The agent fixes its own call instead of
-   guessing twice.
+| Tier | Operations | Rule |
+|---|---|---|
+| **Open** | every read, `cmc_create_item`, `cmc_post_update` | Applies immediately. Purely additive: nothing a person wrote is changed or lost. |
+| **Gated** | `cmc_update_item`, `cmc_set_status` | Creates a proposal. A person approves or rejects it in the web UI. |
+| **Absent** | delete, restore, users, vocabulary, import | No tool exists. |
+
+`cmc_set_status` is the debatable one. It is fully reversible and fully
+audited, which argues for open; but status is what both teams steer by on
+the board and the dashboard, so a wrong one misleads people before anyone
+notices. It starts gated and can be promoted per token (§7.4).
+
+Clearing a field counts as overwriting, so blanking a due date or emptying
+the notes column is gated like any other edit.
+
+### 7.2 How approval works
+
+The gated tools do not apply a change. They write a **`pending_change`**
+row and return "proposed, awaiting approval" with the diff and a link.
+
+- A person sees pending proposals in three places: a count on the
+  dashboard, a badge on the item in the table and board, and a card on the
+  item detail sheet showing the diff, the agent's rationale, and the token
+  that proposed it.
+- Approve applies the change through the normal service call, so the audit
+  row records the **approver** as the actor with `via = mcp_approved` and
+  the proposing token's name alongside. Accountability lands on the human
+  who said yes, which is the point.
+- Reject records the decision and an optional reason. Both outcomes are
+  audited.
+- A proposal expires after `PENDING_CHANGE_TTL_DAYS` (7) so the queue
+  cannot silently accumulate.
+- If the item changed after the proposal was computed, the proposal is
+  marked **stale**; approving it shows the new diff and requires a second
+  confirmation, so an agent's week-old edit can never quietly clobber
+  yesterday's work.
+
+**One dependency to be honest about.** V2.0 has no notifications, so a
+proposal is only seen when someone opens the app. Both teams look at the
+dashboard daily, and the expiry keeps stale proposals from piling up, so
+this is workable — but if agent use grows, emailed proposal alerts become
+the first thing worth adding from the V2.x backlog.
+
+**A policy question for the team.** Any member can approve, since v1 §6
+already lets both orgs edit everything. Whether the token's own owner may
+approve their own agent's proposal is a choice: allowing it is the normal,
+convenient case (you asked the agent to do it, you confirm it did it
+right); forbidding it via `PENDING_CHANGE_SELF_APPROVE=false` gives true
+four-eyes separation at the cost of needing a second person for every edit.
+Recommendation: allow it, and revisit if an auditor asks otherwise.
+
+### 7.3 What keeps open creates safe
+
+Leaving creates open is the right call — it is what makes the
+meeting-minutes flow work — but "additive" is not the same as "harmless"
+here, for two reasons worth guarding.
+
+**Duplicates are the real risk.** An agent that files "Stability protocol
+review" when #31 already covers it creates silent drift: two rows, two
+owners, two timelines for one commitment. That is arguably worse than a bad
+edit, because an edit shows up in history and a duplicate shows up nowhere.
+So `cmc_create_item` searches active items for a close title match first
+and refuses on a strong hit, naming the candidate and asking the agent to
+either post an update on the existing item or pass `confirm_new=true`.
+
+**Entry numbers are permanent.** `entry_no` is max+1 and both teams cite it
+in email and minutes. A junk item consumes a number even after it is
+soft-deleted. The duplicate check and the idempotency key together make
+accidental consumption unlikely, and that is the right level of effort —
+protecting it further is not worth gating creates.
+
+**Review after the fact, not approval before it.** Agent-created items
+carry a "raised by agent, unreviewed" chip until a person opens or edits
+them, and the dashboard lists them under needs-attention. This gives the
+visibility an approval queue would give, at a fraction of the cost, without
+blocking the flow that makes the feature worth having.
+
+### 7.4 Per-token posture
+
+Each token carries a **write mode**, so the boundary can be tightened or
+relaxed per agent without code changes:
+
+| Mode | Effect |
+|---|---|
+| `read_only` | no write tools at all |
+| `append` | open tier only: create and post update |
+| `propose` | **default** — append tier applies, gated tier proposes |
+| `direct_status` | as `propose`, but status changes apply immediately |
+
+`direct_status` is how `cmc_set_status` gets promoted for a trusted agent
+once the team has seen it behave, without opening field edits. There is
+deliberately no mode that applies `cmc_update_item` without a human.
+
+`MCP_WRITES_ENABLED=false` remains the global kill switch across all modes.
+
+### 7.5 The other guardrails
+
+These apply across both tiers and are unchanged from the original design:
+
+1. **`dry_run` on every write**, returning the exact diff and changing
+   nothing. `cmc_apply_batch` defaults to a preview.
+2. **Optimistic concurrency** via `expected_updated_at`, so a stale write
+   fails with a conflict and the current item rather than overwriting a
+   colleague.
+3. **Idempotency keys** on create, so a retry after a timeout cannot file
+   entry 58 twice.
+4. **Per-token rate limits**, 60 writes and 600 reads per minute.
+5. **Client-side prompts.** Because every write tool is annotated
+   non-read-only, MCP clients that confirm such calls will also prompt the
+   operator. This is free and worth having, but it is not the approval
+   mechanism: it depends on client configuration, the operator can disable
+   it, and it does not apply to headless agents. Server-side proposals are
+   what actually enforce the boundary.
 
 ## 8. Errors, context, and conventions
 
@@ -253,9 +375,16 @@ Migration `0003` (after V2.0's `0002`), additive and engine-neutral:
 
 | Table | Change |
 |---|---|
-| `api_token` | new (unique `token_hash`; index on `user_id`) |
-| `audit_event` | + `via` (str(8), default `web`), + `token_name` (str(100), nullable) |
-| `action_item` | + `idempotency_key` (str(64), nullable, unique per program) |
+| `api_token` | new (unique `token_hash`; index on `user_id`); includes `write_mode` |
+| `pending_change` | new — `program_id`, `item_id`, `kind` (`item_patch`\|`status_change`), `payload` JSON, `rationale`, `base_updated_at`, `proposed_by`, `token_name`, `state` (`pending`\|`applied`\|`rejected`\|`expired`), `decided_by`, `decided_at`, `decision_note`, `expires_at`; index on `(program_id, state)` |
+| `audit_event` | + `via` (str(16), default `web`; `mcp`, `mcp_approved`, `cli`, `import`), + `token_name` (str(100), nullable) |
+| `action_item` | + `idempotency_key` (str(64), nullable, unique per program), + `agent_reviewed_at` (datetime, nullable — null on an agent-created item until a person opens or edits it) |
+
+New endpoints for the queue: `GET /pending-changes` (filters: state, item,
+proposer), `POST /pending-changes/{id}/approve`, `POST
+/pending-changes/{id}/reject`. Approval calls the same service the UI
+calls, so the applied change is audited normally with the approver as
+actor.
 
 | Variable | Default | Purpose |
 |---|---|---|
@@ -265,6 +394,9 @@ Migration `0003` (after V2.0's `0002`), additive and engine-neutral:
 | `MCP_RATE_WRITES_PER_MIN` | `60` | per token |
 | `MCP_RATE_READS_PER_MIN` | `600` | per token |
 | `IDEMPOTENCY_TTL_HOURS` | `24` | create-retry window |
+| `MCP_DEFAULT_WRITE_MODE` | `propose` | write mode for a new token |
+| `PENDING_CHANGE_TTL_DAYS` | `7` | a proposal expires unreviewed |
+| `PENDING_CHANGE_SELF_APPROVE` | `true` | may a token's owner approve their own agent's proposal (§7.2) |
 
 One new backend dependency: `mcp` (the official Python SDK), pinned. Read
 its README at implementation time rather than from memory — the ASGI
@@ -284,24 +416,35 @@ more than adding them now:
 
 ## 10. Phasing
 
-Four tasks, roughly one v1 phase in total, on branch `v2/mcp-agent-access`.
+Five tasks, a little over one v1 phase in total, on branch
+`v2/mcp-agent-access`.
 
-1. **Tokens (no MCP yet).** `api_token` model, migration, service, scope
-   checks, the `get_current_principal` dependency, CLI commands, the admin
-   and profile screens, audit rows. Testable and useful on its own: it also
-   gives the REST API a non-cookie credential.
+1. **Tokens (no MCP yet).** `api_token` model with `write_mode`, migration,
+   service, scope checks, the `get_current_principal` dependency, CLI
+   commands, the admin and profile screens, audit rows. Useful on its own:
+   it also gives the REST API a non-cookie credential.
 2. **Read-only MCP.** Mount `/mcp`, the eight read tools, the briefing
    resource, error mapping, rate limits. Ship it and let the team point an
-   agent at it in read-only mode for a week — the cheapest way to find out
-   whether the tool shapes are right before any write exists.
-3. **Writes.** The five write tools, `dry_run`, `expected_updated_at`,
-   idempotency keys, the `via` and `token_name` audit fields flowing
-   through, the two prompts.
-4. **Export and hardening.** `cmc_export_workbook` with signed URLs, the
+   agent at it for a week — the cheapest way to learn whether the tool
+   shapes are right before any write exists.
+3. **Open writes.** `cmc_post_update` and `cmc_create_item`, the
+   near-duplicate check, idempotency keys, the unreviewed chip and its
+   dashboard list, `dry_run`, and the `via` and `token_name` audit fields
+   flowing through. **This is the release that delivers most of the value**
+   — updating entries and filing new ones, unattended, fully audited.
+4. **Approval queue and gated writes.** `pending_change`, the approve and
+   reject endpoints, the dashboard count, the item badge and diff card,
+   expiry and staleness, then `cmc_update_item` and `cmc_set_status` on top
+   of it, plus `cmc_apply_batch` spanning both tiers.
+5. **Export and hardening.** `cmc_export_workbook` with signed URLs, the
    evaluation suite (§11), docs, and the tagged release.
 
-Shipping read-only first is the important call here. It de-risks the tool
-design with real agents at zero blast radius.
+Two sequencing calls matter here. **Read-only first** de-risks the tool
+design against real agents at zero blast radius. **Open writes before the
+approval queue** means the team gets the valuable half early and can decide
+from experience whether the queue in step 4 is worth building, or whether
+field edits should simply stay in the web UI. If they choose the latter,
+step 4 shrinks to nothing and the design still holds.
 
 ## 11. Testing and evaluation
 
@@ -331,7 +474,10 @@ Beyond the project's existing layers:
 
 | Risk | Mitigation |
 |---|---|
-| An agent writes plausible but wrong content to a regulated tracker | Nothing is destructive; every change is reversible by editing; the audit trail names the token; `dry_run` and the batch default let a person approve first; read-only phase first |
+| An agent overwrites something a person wrote | It cannot: field and status changes are proposals a person approves, and the audit row names the approver |
+| An agent files a duplicate or junk item | Near-duplicate check refuses close title matches; idempotency keys stop retry doubles; agent-created items are chipped unreviewed and listed on the dashboard |
+| A proposal sits unseen because there are no notifications | Dashboard count, item badge, and a 7-day expiry; emailed alerts are the first V2.x item to pull in if agent use grows |
+| Approval becomes a rubber stamp | The diff and the agent's rationale are shown, not just a yes button; stale proposals force a second confirmation against the current item |
 | A token leaks | Hashed at rest, prefix-identifiable, revocable instantly, expiring by default, scoped to one user's own permissions, and `MCP_WRITES_ENABLED=false` disables all writes at once |
 | Agents flood the database | Per-token rate limits, hard page caps, and the same single-container profile the UI already runs in |
 | Tool surface churn breaks clients | Tool names and required arguments are treated as an API: additive changes only within a major version, and `cmc_whoami` reports the server version |
@@ -340,20 +486,34 @@ Beyond the project's existing layers:
 
 ## 13. Acceptance
 
-- An admin mints a `read,write` token for a member; the raw token is shown
-  once and never again, and the listing shows only its prefix.
-- An agent configured with that token calls `cmc_whoami` and gets the
-  member's name, org, and scopes.
-- The agent finds entry 42 by searching its title, reads it, posts a dated
-  update, and sets the status to blocked with a note — three calls, no
-  browser.
-- The web UI shows that update in the timeline, the History tab shows the
-  two changes with a "via agent" source and the token's name, and the Audit
-  log filters to them by source.
-- A `read`-scoped token attempting the same write is refused with a message
-  naming the missing scope.
-- `cmc_apply_batch` with six changes returns a preview by default; run with
-  `dry_run=false` it applies all six or none.
-- Revoking the token stops the next call immediately.
+- An admin mints a `read,write` token in `propose` mode for a member; the
+  raw token is shown once and never again, and the listing shows only its
+  prefix.
+- An agent with that token calls `cmc_whoami` and gets the member's name,
+  org, scopes, and write mode.
+- **Open path:** the agent finds entry 42 by searching its title, reads it,
+  and posts a dated update — no browser, no prompt, applied immediately.
+  The web UI shows the update in the timeline and the History tab marks it
+  "via agent" with the token's name.
+- **Open path, create:** the agent files a new action item; it appears with
+  an "unreviewed" chip and on the dashboard's needs-attention list until a
+  person opens it. Filing a near-identical title instead returns the
+  existing entry number and refuses without `confirm_new`.
+- **Gated path:** the agent proposes a due-date change. Nothing changes on
+  the item. A count appears on the dashboard, a badge on the item, and the
+  detail sheet shows the diff plus the agent's rationale. Approving applies
+  it and audits the **approver** as the actor; rejecting records the
+  decision. Both are visible in the Audit log filtered by source.
+- A proposal whose item changed in the meantime is flagged stale and
+  requires a second confirmation showing the new diff.
+- A token in `append` mode is refused on the gated tools with a message
+  naming its mode; a `read` token is refused on every write.
+- No tool exists for delete, restore, users, vocabulary, or import — the
+  agent's tool list simply does not contain them.
+- `cmc_apply_batch` with six changes returns a preview by default; run for
+  real it applies the open ones and queues the gated ones, and says which
+  did what.
+- Revoking the token stops the next call immediately; `MCP_WRITES_ENABLED=false`
+  stops all writes while leaving reads working.
 - `docker compose up -d` from a V2.0 volume serves `/mcp` with no new
   container, no new port, and no new required environment variable.
