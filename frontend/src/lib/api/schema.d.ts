@@ -157,6 +157,44 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All
+         * @description Own tokens by default; every user's when an admin passes ``all``.
+         */
+        get: operations["list_all_api_tokens_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke */
+        delete: operations["revoke_api_tokens__token_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/invitations": {
         parameters: {
             query?: never;
@@ -586,6 +624,22 @@ export interface components {
             error?: components["schemas"]["ErrorBody"] | null;
             meta?: components["schemas"]["Meta"] | null;
         };
+        /** Envelope[TokenCreated] */
+        Envelope_TokenCreated_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["TokenCreated"] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
+        };
+        /** Envelope[TokenOut] */
+        Envelope_TokenOut_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["TokenOut"] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
+        };
         /** Envelope[UpdateOut] */
         Envelope_UpdateOut_: {
             /** Success */
@@ -634,6 +688,15 @@ export interface components {
             success: boolean;
             /** Data */
             data?: components["schemas"]["ItemOut"][] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
+        };
+        /** Envelope[list[TokenOut]] */
+        Envelope_list_TokenOut__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["TokenOut"][] | null;
             error?: components["schemas"]["ErrorBody"] | null;
             meta?: components["schemas"]["Meta"] | null;
         };
@@ -1023,6 +1086,67 @@ export interface components {
              */
             expires_at: string;
         };
+        /** TokenCreate */
+        TokenCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Scopes
+             * @default [
+             *       "read"
+             *     ]
+             */
+            scopes: ("read" | "write")[];
+            /**
+             * Write Mode
+             * @default interactive
+             * @enum {string}
+             */
+            write_mode: "append" | "interactive";
+            /** User Id */
+            user_id?: number | null;
+            /** Ttl Days */
+            ttl_days?: number | null;
+        };
+        /**
+         * TokenCreated
+         * @description The only response that ever carries the raw token value.
+         */
+        TokenCreated: {
+            /** Token */
+            token: string;
+            record: components["schemas"]["TokenOut"];
+        };
+        /** TokenOut */
+        TokenOut: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** User Name */
+            user_name: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /** Scopes */
+            scopes: string[];
+            /** Write Mode */
+            write_mode: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Is Active */
+            is_active: boolean;
+        };
         /** UpdateCreate */
         UpdateCreate: {
             /** Body */
@@ -1267,7 +1391,7 @@ export interface operations {
             query?: {
                 org?: ("gensci" | "yarrow") | null;
                 actor_id?: number | null;
-                entity_type?: ("item" | "user" | "invitation" | "vocab_term" | "import") | null;
+                entity_type?: ("item" | "user" | "invitation" | "vocab_term" | "import" | "api_token") | null;
                 since?: string | null;
                 page?: number;
                 limit?: number;
@@ -1391,6 +1515,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_ResetLinkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_api_tokens_get: {
+        parameters: {
+            query?: {
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_TokenOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_api_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_TokenCreated_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_TokenOut_"];
                 };
             };
             /** @description Validation Error */
