@@ -47,6 +47,12 @@ class McpClient:
     def call(self, name: str, **arguments) -> dict:
         return self._rpc("tools/call", {"name": name, "arguments": arguments})["result"]
 
+    def error(self, name: str, **arguments) -> str:
+        """Call a tool that must refuse, and return the refusal text."""
+        result = self.call(name, **arguments)
+        assert result.get("isError"), result["content"]
+        return "\n".join(part["text"] for part in result["content"] if part["type"] == "text")
+
     def text(self, name: str, **arguments) -> str:
         result = self.call(name, **arguments)
         assert not result.get("isError"), result["content"]
@@ -81,6 +87,39 @@ def mcp_client(app, cli_db, admin):
         mcp = McpClient(client, raw)
         mcp.initialize()
         yield mcp
+
+
+@pytest.fixture
+def mcp_as(app, cli_db, admin):
+    """Build a client for a token with the given scopes and write mode.
+
+    Yields a factory; every client it makes shares one TestClient and lifespan.
+    """
+    from app.services.tokens import create_token
+
+    with TestClient(app) as client:
+
+        def make(scopes=("read", "write"), write_mode="interactive", owner=None, name=None):
+            who = owner or admin
+            label = name or f"Agent {write_mode} {'+'.join(scopes)}"
+            _, raw = create_token(
+                cli_db,
+                actor=admin,
+                owner=who,
+                name=label,
+                scopes=list(scopes),
+                write_mode=write_mode,
+            )
+            mcp = McpClient(client, raw)
+            mcp.initialize()
+            return mcp
+
+        yield make
+
+
+@pytest.fixture
+def mcp_writer(mcp_as):
+    return mcp_as(name="Claude Code")
 
 
 @pytest.fixture

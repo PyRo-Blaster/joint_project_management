@@ -7,6 +7,7 @@ from typing import Any, Literal
 
 import anyio.to_thread
 from mcp.server.mcpserver.exceptions import ToolError
+from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
@@ -69,7 +70,9 @@ def open_session() -> Iterator[Session]:
 
 
 ToolBody = Callable[[Session, Caller, Program], str]
-ToolKind = Literal["read", "write"]
+# read: changes nothing. write: additive (post an update, file an item).
+# edit: changes an existing value; needs the interactive write mode (design 7.5).
+ToolKind = Literal["read", "write", "edit"]
 
 # One limiter per kind, keyed by token id. In-memory and per process, like the
 # login limiter: the container runs a single uvicorn worker. Tests may replace
@@ -78,6 +81,7 @@ LIMITERS: dict[str, SlidingWindowLimiter] = {}
 
 
 def _limiter(kind: ToolKind) -> SlidingWindowLimiter:
+    kind = "read" if kind == "read" else "write"  # edits spend the write budget
     if kind not in LIMITERS:
         settings = get_settings()
         per_minute = (
@@ -88,12 +92,48 @@ def _limiter(kind: ToolKind) -> SlidingWindowLimiter:
 
 
 def enforce_rate_limit(caller: Caller, kind: ToolKind) -> None:
+    budget = "read" if kind == "read" else "write"
     if not _limiter(kind).allow(str(caller.token.id)):
         per_minute = _limiter(kind).limit
         raise ToolError(
-            f"Rate limit reached for token '{caller.token.name}': {per_minute} {kind} calls "
+            f"Rate limit reached for token '{caller.token.name}': {per_minute} {budget} calls "
             "per minute. Wait a minute and retry."
         )
+
+
+def enforce_write_permission(caller: Caller, kind: ToolKind) -> None:
+    """The kill switch, the write scope, and (for edits) the write mode, in that order."""
+    if kind == "read":
+        return
+    if not get_settings().mcp_writes_enabled:
+        raise ToolError(
+            "Writes are switched off on this server (MCP_WRITES_ENABLED=false). Reads still work."
+        )
+    if "write" not in caller.token.scope_set:
+        raise ToolError(
+            f'This token has scope "{caller.token.scopes}". Changing the tracker needs "write". '
+            "Create a token with write access under API tokens in the web app."
+        )
+    if kind == "edit" and caller.token.write_mode != "interactive":
+        raise ToolError(
+            f"Token '{caller.token.name}' is in {caller.token.write_mode} mode: it can post "
+            "updates and file items but never edit one, because nobody is there to confirm. "
+            "Edit in the web app, or use a token in interactive mode."
+        )
+
+
+def describe_error(exc: DomainError | ValidationError) -> str:
+    """Keep per-field detail: 'Invalid input' alone tells an agent nothing."""
+    if isinstance(exc, ValidationError):
+        parts = []
+        for error in exc.errors():
+            field = ".".join(str(part) for part in error["loc"]) or "input"
+            parts.append(f"{field}: {error['msg']}")
+        return "Invalid input — " + "; ".join(parts)
+    if exc.fields:
+        detail = "; ".join(f"{field}: {message}" for field, message in exc.fields.items())
+        return f"{exc.message} — {detail}"
+    return exc.message
 
 
 async def call_tool(ctx: Any, body: ToolBody, *, kind: ToolKind = "read") -> str:
@@ -108,10 +148,11 @@ async def call_tool(ctx: Any, body: ToolBody, *, kind: ToolKind = "read") -> str
         try:
             with open_session() as db:
                 caller = resolve_caller(db, headers)
+                enforce_write_permission(caller, kind)
                 enforce_rate_limit(caller, kind)
                 return body(db, caller, current_program(db))
-        except DomainError as exc:
-            raise ToolError(exc.message) from exc
+        except (DomainError, ValidationError) as exc:
+            raise ToolError(describe_error(exc)) from exc
 
     return await anyio.to_thread.run_sync(run)
 
@@ -123,7 +164,7 @@ async def call_unauthenticated(body: Callable[[Session], str]) -> str:
         try:
             with open_session() as db:
                 return body(db)
-        except DomainError as exc:
-            raise ToolError(exc.message) from exc
+        except (DomainError, ValidationError) as exc:
+            raise ToolError(describe_error(exc)) from exc
 
     return await anyio.to_thread.run_sync(run)

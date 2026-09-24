@@ -19,12 +19,14 @@ Call cmc_list_vocabulary before filtering on or quoting a group or category:
 the valid values are programme-specific. Read cmc://program/briefing once for
 the conventions both teams follow.
 
-This server is read-only. Nothing here changes the tracker.\
+Writing is additive only in this release: cmc_post_update appends a dated note and
+cmc_create_item files a new item, which stays flagged until a person reviews it.
+There is no tool that deletes anything, and there never will be.\
 """
 
 
 def build_mcp_server() -> MCPServer:
-    from app.mcp import tools_read
+    from app.mcp import prompts, tools_read, tools_write
 
     server = MCPServer(
         name="joint-cmc-tracker",
@@ -33,6 +35,8 @@ def build_mcp_server() -> MCPServer:
         instructions=INSTRUCTIONS,
     )
     tools_read.register(server)
+    tools_write.register(server)
+    prompts.register(server)
     return server
 
 
