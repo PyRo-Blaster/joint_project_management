@@ -51,18 +51,29 @@ def review_flags(db: Session, items: Sequence[ActionItem]) -> dict[int, bool]:
     return {item.id: _pending(touches.get(item.id), item.agent_ack_at) for item in items}
 
 
-def pending_review_items(db: Session, program_id: int) -> list[ActionItem]:
+def _pending_select(columns):
     touches = _agent_touch_query().subquery()
+    touched_at = touches.c[1]
     stmt = (
-        select(ActionItem)
+        select(*columns(touched_at))
         .join(touches, touches.c.entity_id == ActionItem.id)
         .where(
-            ActionItem.program_id == program_id,
             ActionItem.deleted_at.is_(None),
-            (ActionItem.agent_ack_at.is_(None)) | (touches.c[1] > ActionItem.agent_ack_at),
+            (ActionItem.agent_ack_at.is_(None)) | (touched_at > ActionItem.agent_ack_at),
         )
-        .order_by(touches.c[1].desc())
     )
+    return stmt, touched_at
+
+
+def pending_review_ids():
+    """A select of item ids awaiting review, for use inside another query's filter."""
+    stmt, _ = _pending_select(lambda touched_at: [ActionItem.id])
+    return stmt
+
+
+def pending_review_items(db: Session, program_id: int) -> list[ActionItem]:
+    stmt, touched_at = _pending_select(lambda touched_at: [ActionItem])
+    stmt = stmt.where(ActionItem.program_id == program_id).order_by(touched_at.desc())
     return list(db.scalars(stmt))
 
 

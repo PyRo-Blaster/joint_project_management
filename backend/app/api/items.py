@@ -5,11 +5,12 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import AdminUser, CurrentUser, DbDep, ProgramDep
+from app.api.deps import AdminUser, CurrentUser, DbDep, ProgramDep, SessionUser
 from app.constants import MAX_PAGE_LIMIT, Kind, OwnerOrg, Priority, Status
 from app.schemas.audit import AuditEventOut, to_audit_out
 from app.schemas.common import Envelope, Meta, ok
 from app.schemas.items import ItemCreate, ItemOut, ItemPatch
+from app.services.agent_review import acknowledge, review_flags
 from app.services.audit import item_history
 from app.services.items import (
     ItemFilters,
@@ -37,6 +38,7 @@ def item_filters(
     due_before: date | None = None,
     due_after: date | None = None,
     q: str | None = None,
+    needs_agent_review: bool = False,
 ) -> ItemFilters:
     return ItemFilters(
         status=tuple(status or ()),
@@ -49,6 +51,7 @@ def item_filters(
         due_before=due_before,
         due_after=due_after,
         q=q,
+        needs_agent_review=needs_agent_review,
     )
 
 
@@ -56,7 +59,11 @@ FiltersDep = Annotated[ItemFilters, Depends(item_filters)]
 
 
 def _out(db, item):
-    return to_item_out(item, last_update_dates(db, [item.id]).get(item.id))
+    return to_item_out(
+        item,
+        last_update_dates(db, [item.id]).get(item.id),
+        review_flags(db, [item])[item.id],
+    )
 
 
 @router.get("", response_model=Envelope[list[ItemOut]])
@@ -74,8 +81,9 @@ def list_all(
         db, program.id, filters, sort=sort, direction=direction, page=page, limit=limit
     )
     latest = last_update_dates(db, [item.id for item in items])
+    flags = review_flags(db, items)
     return ok(
-        [to_item_out(item, latest.get(item.id)) for item in items],
+        [to_item_out(item, latest.get(item.id), flags[item.id]) for item in items],
         meta=Meta(total=total, page=page, limit=limit),
     )
 
@@ -111,3 +119,12 @@ def restore(item_id: int, admin: AdminUser, db: DbDep, program: ProgramDep):
 def history(item_id: int, _user: CurrentUser, db: DbDep, program: ProgramDep):
     item = get_item(db, program.id, item_id, include_deleted=True)
     return ok([to_audit_out(event, actor) for event, actor in item_history(db, item.id)])
+
+
+@router.post("/{item_id}/ack", response_model=Envelope[ItemOut])
+def acknowledge_agent_changes(item_id: int, user: SessionUser, db: DbDep, program: ProgramDep):
+    """A person confirms an agent's work on this item. Tokens are refused: an agent
+    marking its own work reviewed would defeat the point."""
+    item = get_item(db, program.id, item_id)
+    acknowledge(db, actor=user, item=item)
+    return ok(_out(db, item))

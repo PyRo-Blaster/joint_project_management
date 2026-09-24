@@ -18,5 +18,5 @@ def test_summary_shape(member_client, vocab):
     body = member_client.get("/api/dashboard/summary").json()["data"]
     assert body["open_total"] == 1
     assert body["open_by_status"]["open"] == 1
-    assert set(body["needs_attention"]) == {"overdue", "due_soon", "stale"}
+    assert set(body["needs_attention"]) == {"overdue", "due_soon", "stale", "agent_unreviewed"}
     assert body["recent_activity"][0]["action"] == "created"
