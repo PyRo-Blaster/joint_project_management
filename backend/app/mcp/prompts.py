@@ -27,3 +27,37 @@ def register(server: MCPServer) -> None:
    which to send; then post each with cmc_post_update, one call per item.
 
 Never change a status, due date or any other field in this task: only post updates."""
+
+    @server.prompt(
+        name="meeting_minutes_to_changes",
+        title="Turn meeting minutes into tracker changes",
+        description=(
+            "Reads pasted minutes and prepares one cmc_apply_batch preview of every status "
+            "change, date change and note they imply, for the person to confirm."
+        ),
+    )
+    def meeting_minutes_to_changes(minutes: str) -> str:
+        return f"""Turn these meeting minutes into changes to the tracker.
+
+<minutes>
+{minutes}
+</minutes>
+
+1. Call cmc_list_vocabulary for the valid statuses and priorities.
+2. For every item the minutes mention by number ("#42") or unmistakably by title,
+   call cmc_get_item to see its current state. Use cmc_search_items to find items
+   mentioned only by title; if a match is not unmistakable, list it as a question
+   instead of guessing.
+3. Build one cmc_apply_batch call: one entry per item, with a status, due_on or
+   priority only where the minutes actually decided one, and a post quoting the
+   decision in one or two sentences so the timeline shows why.
+4. Call cmc_apply_batch WITHOUT confirm. It changes nothing and returns a diff and
+   a confirm token. Show me that diff, plus any open questions, and wait.
+5. Only when I say yes, call cmc_apply_batch again with the same changes and the
+   confirm token. If it reports that an item changed in the meantime, re-read it
+   and prepare a fresh preview; do not retry blindly.
+
+New actions agreed in the meeting are separate: list them for me, and file each
+with cmc_create_item only after I confirm, since it refuses near-duplicates.
+Never try to change a title, group, owner or kind; those are changed in the web
+app."""
