@@ -7,6 +7,8 @@ JSON-RPC over plain HTTP so it tests the real transport, not the test client.
 """
 
 import json
+import os
+import re
 import sys
 import urllib.error
 import urllib.request
@@ -36,6 +38,31 @@ def call(name: str, headers: dict | None = None, **arguments) -> tuple[bool, str
     result = rpc("tools/call", {"name": name, "arguments": arguments}, headers)["result"]
     text = "\n".join(part.get("text", "") for part in result["content"])
     return bool(result.get("isError")), text
+
+
+def login() -> str:
+    """Sign in as the seeded admin and return the session cookie."""
+    body = json.dumps(
+        {"email": os.environ["ADMIN_EMAIL"], "password": os.environ["ADMIN_PASSWORD"]}
+    ).encode()
+    request = urllib.request.Request(
+        f"{BASE}/api/auth/login", data=body, method="POST",
+        headers={"Content-Type": "application/json", "X-Requested-With": "fetch"},
+    )
+    with urllib.request.urlopen(request, timeout=20) as response:
+        return response.headers["Set-Cookie"].split(";", 1)[0]
+
+
+def api(cookie: str, method: str, path: str) -> dict:
+    request = urllib.request.Request(
+        f"{BASE}{path}", method=method, data=b"" if method == "POST" else None,
+        headers={"Cookie": cookie, "X-Requested-With": "fetch"},
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return json.loads(response.read())
+    except urllib.error.HTTPError as failed:
+        return json.loads(failed.read())
 
 
 def check(label: str, condition: bool, detail: str = "") -> None:
@@ -95,6 +122,39 @@ def main() -> int:
     check("post update appends", not error and "Posted an update on #1" in text, text)
     error, text = call("cmc_get_item_history", entry_no=1)
     check("history marks the agent", not error and "[agent]" in text, text)
+
+    print("edits with confirm (phase 4)")
+    for expected in ("cmc_set_status", "cmc_update_item", "cmc_apply_batch"):
+        check(f"lists {expected}", expected in names)
+    error, preview = call("cmc_set_status", entry_no=1, status="blocked", note="Smoke: waiting")
+    token = re.search(r'confirm="(ct_[^"]+)"', preview)
+    check("status preview returns a confirm token", not error and bool(token), preview)
+    error, text = call("cmc_search_items", status=["blocked"])
+    check("preview changed nothing", "No items match" in text, text)
+    if token:
+        error, text = call("cmc_set_status", entry_no=1, status="cancelled", confirm=token.group(1))
+        check("token refuses other arguments", error and "does not match" in text, text)
+        error, text = call(
+            "cmc_set_status", entry_no=1, status="blocked", note="Smoke: waiting",
+            confirm=token.group(1),
+        )
+        check("confirm applies", not error and text.startswith("Applied"), text)
+    error, text = call("cmc_update_item", entry_no=1, title="Renamed by an agent")
+    check("identity field is refused", error and "web app" in text, text)
+    error, text = call("cmc_create_item", title="t", group="General Issues", owner_org="gensci",
+                       prority="p1")
+    check("typo is refused, not dropped", error and "priority" in text, text)
+
+    print("undo through a person's session (phase 4)")
+    session = login()
+    history = api(session, "GET", "/api/items/1/history")["data"]
+    change = next((e for e in history if e["action"] == "status_changed"), None)
+    check("agent status change is undoable", bool(change and change["can_undo"]), str(change))
+    if change:
+        undone = api(session, "POST", f"/api/activity/{change['id']}/revert")
+        check("undo reverts it", undone.get("data", {}).get("action") == "reverted", str(undone))
+        item = api(session, "GET", "/api/items/1")["data"]
+        check("status is back", item["status"] != "blocked", str(item["status"]))
 
     print("auth")
     anonymous = {key: value for key, value in HEADERS.items() if key != "Authorization"}

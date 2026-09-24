@@ -131,11 +131,18 @@ curl -H "Authorization: Bearer cmct_..." http://localhost:8000/api/items
 
 The container also serves a [Model Context Protocol](https://modelcontextprotocol.io)
 endpoint at `/mcp`, so an agent can read the tracker without driving a browser.
-Writing is **additive only** in this release: an agent can append a dated
-update and file a new item, and there is no tool for deleting in any release.
-A new item an agent files carries an **Unreviewed** chip until a person clicks
-*Looks right* on it or edits it, and every agent change is marked in History
-with the token that made it.
+**Additive writes apply at once**: an agent can append a dated update and file
+a new item. **Edits take two calls**: the first changes nothing and returns the
+exact diff with a confirm token; the agent shows the person, and only when they
+agree calls again with the token. An agent can change an item's live state
+(status, dates, priority, category, assignee, details, notes, file path) but
+never its identity (title, group, owner, kind). No tool deletes, in any release.
+
+Anything an agent filed or changed carries an **Unreviewed** chip until a person
+clicks *Looks right* or edits the item, and the dashboard says when something is
+waiting. Every change, a person's or an agent's, can be **undone** from the item's
+History for 14 days, unless a field has changed again since; the change and its
+undoing both stay in the trail.
 
 Point a client that speaks streamable HTTP at `http://<host>:8000/mcp/` with
 the header `Authorization: Bearer cmct_...`. A stdio-only client can bridge
@@ -153,6 +160,13 @@ with `npx mcp-remote http://<host>:8000/mcp/ --header "Authorization: Bearer cmc
 | `cmc_list_activity` | Recent changes across the programme |
 | `cmc_post_update` | Append a dated progress note to an item (needs `write`) |
 | `cmc_create_item` | File a new item; refuses near-duplicate titles (needs `write`) |
+| `cmc_set_status` | Change a status, with an optional note; preview then confirm |
+| `cmc_update_item` | Change live fields; preview then confirm |
+| `cmc_apply_batch` | Up to 50 changes and notes as one all-or-nothing transaction |
+
+A token in **append** mode (for agents nobody is watching) can use the additive
+tools but none of the edit tools. Two prompts ship with the server:
+`weekly_update` and `meeting_minutes_to_changes`.
 
 The resource `cmc://program/briefing` carries the conventions both teams
 follow; an agent should read it once. Set `MCP_ENABLED=false` to stop serving
