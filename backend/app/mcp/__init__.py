@@ -24,12 +24,14 @@ a dated note and cmc_create_item files a new item, flagged until a person review
 it. Edit tools (cmc_set_status, cmc_update_item, cmc_apply_batch) take two calls:
 the first changes nothing and returns a diff and a confirm token; show the person
 the diff, and only when they agree, call again with the token. Title, group,
-owner and kind cannot be edited here. No tool deletes anything, and none ever will.\
+owner and kind cannot be edited here. No tool deletes anything, and none ever will.
+
+cmc_export_workbook returns a short-lived download link for a person, not the file.\
 """
 
 
 def build_mcp_server() -> MCPServer:
-    from app.mcp import prompts, tools_edit, tools_read, tools_write
+    from app.mcp import prompts, tools_edit, tools_export, tools_read, tools_write
     from app.mcp.strict_args import StrictArguments
 
     strict = StrictArguments()
@@ -44,6 +46,7 @@ def build_mcp_server() -> MCPServer:
     tools_read.register(server)
     tools_write.register(server)
     tools_edit.register(server)
+    tools_export.register(server)
     prompts.register(server)
     return server
 
