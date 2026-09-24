@@ -124,3 +124,17 @@ def test_the_dataset_is_fictional():
     # Every person is on the reserved example domain, so no real address ships.
     assert all(email.endswith("@eval.example") for _, email, _ in PEOPLE)
     assert len(ROWS) == 12
+
+
+def test_seed_eval_cli_loads_once(cli_db, admin, program, vocab):
+    from typer.testing import CliRunner
+
+    from app.cli import cli
+
+    runner = CliRunner()
+    first = runner.invoke(cli, ["seed-eval"])
+    assert first.exit_code == 0, first.output
+    assert "seeded 12 evaluation items" in first.output
+    second = runner.invoke(cli, ["seed-eval"])
+    assert second.exit_code != 0
+    assert "only into an empty programme" in second.output

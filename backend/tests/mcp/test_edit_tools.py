@@ -91,6 +91,24 @@ def test_a_stale_confirm_names_who_changed_what(mcp_writer, cli_db, program, adm
     assert _fresh(cli_db, item).status == "in_progress"
 
 
+def test_a_stale_confirm_returns_the_new_diff_and_a_fresh_token(
+    mcp_writer, cli_db, program, admin, vocab
+):
+    item = make_item(cli_db, program, admin, status="in_progress")
+    args = {"entry_no": item.entry_no, "status": "completed"}
+    token = token_from(mcp_writer.text("cmc_set_status", **args))
+    patch_item(cli_db, actor=admin, item=_fresh(cli_db, item), patch=ItemPatch(status="blocked"))
+
+    message = mcp_writer.error("cmc_set_status", **args, confirm=token)
+    assert "status: blocked → completed" in message  # the diff from the item's new state
+    fresh = token_from(message)
+    assert fresh != token
+
+    applied = mcp_writer.text("cmc_set_status", **args, confirm=fresh)
+    assert applied.startswith("Applied")
+    assert _fresh(cli_db, item).status == "completed"
+
+
 def test_a_timeline_note_since_the_preview_does_not_make_it_stale(
     mcp_writer, cli_db, program, admin, vocab
 ):
