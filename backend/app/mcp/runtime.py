@@ -3,7 +3,7 @@
 from collections.abc import Callable, Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Any
+from typing import Any, Literal
 
 import anyio.to_thread
 from mcp.server.mcpserver.exceptions import ToolError
@@ -16,6 +16,7 @@ from app.db import get_session_factory
 from app.models import ApiToken, Program, User
 from app.services.errors import DomainError, UnauthenticatedError
 from app.services.principal import Principal, set_principal
+from app.services.rate_limit import SlidingWindowLimiter
 from app.services.tokens import resolve_token
 
 NO_TOKEN = (
@@ -68,9 +69,34 @@ def open_session() -> Iterator[Session]:
 
 
 ToolBody = Callable[[Session, Caller, Program], str]
+ToolKind = Literal["read", "write"]
+
+# One limiter per kind, keyed by token id. In-memory and per process, like the
+# login limiter: the container runs a single uvicorn worker. Tests may replace
+# an entry; the autouse fixture in tests/mcp clears the dict between tests.
+LIMITERS: dict[str, SlidingWindowLimiter] = {}
 
 
-async def call_tool(ctx: Any, body: ToolBody) -> str:
+def _limiter(kind: ToolKind) -> SlidingWindowLimiter:
+    if kind not in LIMITERS:
+        settings = get_settings()
+        per_minute = (
+            settings.mcp_rate_writes_per_min if kind == "write" else settings.mcp_rate_reads_per_min
+        )
+        LIMITERS[kind] = SlidingWindowLimiter(limit=per_minute, window_seconds=60)
+    return LIMITERS[kind]
+
+
+def enforce_rate_limit(caller: Caller, kind: ToolKind) -> None:
+    if not _limiter(kind).allow(str(caller.token.id)):
+        per_minute = _limiter(kind).limit
+        raise ToolError(
+            f"Rate limit reached for token '{caller.token.name}': {per_minute} {kind} calls "
+            "per minute. Wait a minute and retry."
+        )
+
+
+async def call_tool(ctx: Any, body: ToolBody, *, kind: ToolKind = "read") -> str:
     """Run a tool body off the event loop, mapping domain errors to ToolError.
 
     The SDK runs tools on the event loop and SQLAlchemy here is synchronous, so
@@ -82,6 +108,7 @@ async def call_tool(ctx: Any, body: ToolBody) -> str:
         try:
             with open_session() as db:
                 caller = resolve_caller(db, headers)
+                enforce_rate_limit(caller, kind)
                 return body(db, caller, current_program(db))
         except DomainError as exc:
             raise ToolError(exc.message) from exc
