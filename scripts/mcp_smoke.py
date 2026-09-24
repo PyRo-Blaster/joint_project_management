@@ -145,6 +145,23 @@ def main() -> int:
                        prority="p1")
     check("typo is refused, not dropped", error and "priority" in text, text)
 
+    print("export (phase 5)")
+    check("lists cmc_export_workbook", "cmc_export_workbook" in names)
+    error, text = call("cmc_export_workbook")
+    link = re.search(r"https?://\S+/api/export/link/dl_\S+", text)
+    check("export returns a link, not bytes", not error and bool(link) and len(text) < 2000, text)
+    if link:
+        with urllib.request.urlopen(link.group(0), timeout=20) as response:
+            body = response.read()
+        check("the link downloads an xlsx with no credential", body[:2] == b"PK", str(body[:20]))
+        try:
+            urllib.request.urlopen(link.group(0)[:-1] + "x", timeout=20)
+            check("a tampered link is refused", False, "download succeeded")
+        except urllib.error.HTTPError as refused:
+            check("a tampered link is refused", refused.code == 404, str(refused.code))
+    error, text = call("cmc_export_workbook", kind="period_report")
+    check("period report is refused as not built", error and "not available yet" in text, text)
+
     print("undo through a person's session (phase 4)")
     session = login()
     history = api(session, "GET", "/api/items/1/history")["data"]

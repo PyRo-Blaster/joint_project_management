@@ -18,6 +18,7 @@ export DATABASE_URL="sqlite:///${WORK}/smoke.db"
 export ADMIN_EMAIL="smoke-admin@example.com"
 export ADMIN_PASSWORD="smoke-admin-pass-12345"
 export STATIC_DIR="${WORK}/no-static"
+export APP_ORIGIN="http://localhost:${PORT}"   # export links are built from it
 
 cleanup() {
   if [[ -n "${SERVER_PID:-}" ]]; then kill "$SERVER_PID" 2>/dev/null || true; fi
