@@ -2,6 +2,7 @@
 
 from dataclasses import dataclass
 from datetime import date
+from difflib import SequenceMatcher
 
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
@@ -10,6 +11,7 @@ from app.constants import STATUS_LABELS
 from app.models import ActionItem, ItemUpdate, Program, User
 from app.models.base import utcnow
 from app.schemas.items import ItemBrief, ItemCreate, ItemOut, ItemPatch
+from app.services.agent_review import acknowledge_on_human_edit
 from app.services.audit import diff_changes, record_event
 from app.services.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.vocab import active_values
@@ -142,6 +144,43 @@ def get_item_by_entry_no(db: Session, program_id: int, entry_no: int) -> ActionI
     return item
 
 
+def find_by_idempotency_key(db: Session, program_id: int, key: str) -> ActionItem | None:
+    return db.scalar(
+        select(ActionItem).where(
+            ActionItem.program_id == program_id, ActionItem.idempotency_key == key
+        )
+    )
+
+
+SIMILAR_TITLE_THRESHOLD = 0.82
+
+
+def _normal_title(title: str) -> str:
+    return " ".join(title.lower().split())
+
+
+def find_similar_items(
+    db: Session, program_id: int, title: str, *, limit: int = 3
+) -> list[tuple[ActionItem, float]]:
+    """Non-deleted items whose title is close to ``title``, best first.
+
+    Guards agent creates against silent drift: two rows for one commitment is
+    worse than a bad edit, because nothing in the history points at it.
+    """
+    wanted = _normal_title(title)
+    candidates = db.scalars(
+        select(ActionItem).where(
+            ActionItem.program_id == program_id, ActionItem.deleted_at.is_(None)
+        )
+    )
+    scored = [
+        (item, SequenceMatcher(None, wanted, _normal_title(item.title)).ratio())
+        for item in candidates
+    ]
+    close = [pair for pair in scored if pair[1] >= SIMILAR_TITLE_THRESHOLD]
+    return sorted(close, key=lambda pair: pair[1], reverse=True)[:limit]
+
+
 def next_entry_no(db: Session, program_id: int) -> int:
     stmt = select(func.max(ActionItem.entry_no)).where(ActionItem.program_id == program_id)
     return (db.scalar(stmt) or 0) + 1
@@ -209,7 +248,13 @@ def _resolve_kind_and_status(item: ActionItem, data: dict) -> None:
 
 
 def create_item(
-    db: Session, *, actor: User, program: Program, data: ItemCreate, today: date | None = None
+    db: Session,
+    *,
+    actor: User,
+    program: Program,
+    data: ItemCreate,
+    today: date | None = None,
+    idempotency_key: str | None = None,
 ) -> ActionItem:
     today = today or date.today()
     payload = data.model_dump()
@@ -238,6 +283,7 @@ def create_item(
         file_path=data.file_path,
         created_by=actor.id,
         updated_by=actor.id,
+        idempotency_key=idempotency_key,
     )
     db.add(item)
     db.flush()
@@ -283,6 +329,7 @@ def patch_item(
         return item
     item.updated_by = actor.id
     item.updated_at = utcnow()
+    acknowledge_on_human_edit(db, item, actor)
     # A kind change also flips the status (an action↔note toggle), so describe it
     # as a general update rather than a bare "status changed … to None".
     is_status_change = "status" in changes and "kind" not in changes
