@@ -27,6 +27,8 @@ function item(o: Partial<ItemOut>): ItemOut {
     updated_at: "2026-01-01T00:00:00",
     deleted_at: null,
     last_update_on: null,
+    needs_agent_review: false,
+    agent_ack_at: null,
     ...o,
   };
 }

@@ -40,7 +40,12 @@ function Group({ title, items, empty }: { title: string; items: ItemBrief[]; emp
 export function NeedsAttention({
   needs,
 }: {
-  needs: { overdue: ItemBrief[]; due_soon: ItemBrief[]; stale: ItemBrief[] };
+  needs: {
+    overdue: ItemBrief[];
+    due_soon: ItemBrief[];
+    stale: ItemBrief[];
+    agent_unreviewed?: ItemBrief[];
+  };
 }) {
   return (
     <Card>
@@ -51,6 +56,11 @@ export function NeedsAttention({
         <Group title="Overdue" items={needs.overdue} empty="Nothing overdue." />
         <Group title="Due soon" items={needs.due_soon} empty="Nothing due soon." />
         <Group title="Stale (no update)" items={needs.stale} empty="No stale items." />
+        <Group
+          title="Filed or changed by an agent, not yet confirmed"
+          items={needs.agent_unreviewed ?? []}
+          empty="Nothing from agents is waiting for review."
+        />
       </CardContent>
     </Card>
   );

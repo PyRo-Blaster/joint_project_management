@@ -11,6 +11,7 @@ import { useToast } from "@/lib/toast";
 import { useAuth } from "@/features/auth/useAuth";
 import { useItem } from "@/features/items/useItem";
 import { useDeleteItem, useRestoreItem } from "@/features/items/useItemMutations";
+import { AgentReviewBar } from "./AgentReviewBar";
 import { DetailsTab } from "./DetailsTab";
 import { HistoryTab } from "./HistoryTab";
 import { UpdatesTab } from "./UpdatesTab";
@@ -83,6 +84,8 @@ export function ItemDetail({ itemId, onClose }: { itemId: number; onClose?: () =
           </div>
         </div>
       </div>
+
+      <AgentReviewBar item={item} />
 
       <div className="flex-1 overflow-y-auto px-6 py-4">
         <Tabs defaultValue="details">

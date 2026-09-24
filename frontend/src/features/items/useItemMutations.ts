@@ -41,3 +41,17 @@ export function useRestoreItem() {
     },
   });
 }
+
+/** A person confirms an agent's work on the item; clears the unreviewed flag. */
+export function useAcknowledgeItem(id: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiFetch<ItemOut>(`/items/${id}/ack`, { method: "POST" }),
+    onSuccess: (item) => {
+      qc.setQueryData(qk.items.detail(id), item);
+      qc.invalidateQueries({ queryKey: qk.items.all() });
+      qc.invalidateQueries({ queryKey: qk.items.history(id) });
+      qc.invalidateQueries({ queryKey: qk.dashboard.summary() });
+    },
+  });
+}
