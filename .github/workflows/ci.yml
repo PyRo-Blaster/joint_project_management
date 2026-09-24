@@ -81,6 +81,24 @@ jobs:
           uv run --python 3.13 alembic upgrade head
           uv run --python 3.13 alembic downgrade base
 
+  mcp-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+      - run: uv python install 3.13
+      - run: uv sync --frozen --python 3.13
+        working-directory: backend
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: MCP over real HTTP on a migrated database, plus the MCP Inspector
+        run: bash scripts/mcp-smoke.sh
+        env:
+          MCP_SMOKE_INSPECTOR: "1"
+
   smoke:
     runs-on: ubuntu-latest
     steps:

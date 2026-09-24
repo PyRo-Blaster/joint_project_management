@@ -40,3 +40,16 @@ for _ in $(seq 1 40); do
 done
 
 "${PYTHON[@]}" python "$ROOT/scripts/mcp_smoke.py" "http://localhost:${PORT}" "$TOKEN"
+
+# Optional: the official MCP Inspector, as an independent client (needs Node).
+if [[ "${MCP_SMOKE_INSPECTOR:-0}" == "1" ]]; then
+  echo "MCP Inspector"
+  LISTED="$(npx -y @modelcontextprotocol/inspector --cli "http://localhost:${PORT}/mcp/" \
+    --transport http --header "Authorization: Bearer ${TOKEN}" --method tools/list)"
+  if grep -q '"cmc_export_workbook"' <<<"$LISTED"; then
+    echo "  ok  the Inspector lists every tool"
+  else
+    echo "  FAIL the Inspector could not list tools" >&2
+    exit 1
+  fi
+fi
