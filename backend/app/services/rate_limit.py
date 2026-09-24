@@ -16,6 +16,10 @@ class SlidingWindowLimiter:
         self._hits: dict[str, deque[float]] = defaultdict(deque)
         self._lock = threading.Lock()
 
+    @property
+    def limit(self) -> int:
+        return self._limit
+
     def allow(self, key: str) -> bool:
         """Record an attempt for `key` and report whether it is within the limit."""
         now = self._clock()

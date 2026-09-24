@@ -104,3 +104,33 @@ live smoke test.
 - Phase 3 adds `cmc_post_update` and `cmc_create_item` as open writes, with the
   near-duplicate check and the unreviewed chip. Phase 4 adds the confirm
   handshake and undo.
+
+## Addendum 2026-09-24: Phase 2 was not complete when first reported
+
+Re-reading design §6.1, §8 and §10 before starting Phase 3 showed that the first
+Phase 2 cut **did not implement its own spec**, though it was reported as done.
+Closed in a follow-up commit, with tests for each:
+
+| Spec item | First cut | Now |
+|---|---|---|
+| Per-token rate limits (§10 lists them in Phase 2) | Deferred as an "open item" | 600 reads and 60 writes per minute per token |
+| `cmc_whoami` returns the server version | Missing | Added |
+| `cmc_search_items` `sort`, `direction` | Missing | Added, bad field names the sortable ones |
+| §8: a bad value names the valid ones | An invalid status silently matched nothing | Statuses, priorities, orgs, kinds, groups, categories all validated, with "Did you mean" |
+| `cmc_get_item` `include_history` | Missing | Added |
+| `cmc_list_updates` `page` | Missing | Added |
+| `cmc_needs_attention` `owner_org`, `assignee` | Missing | Added |
+| `cmc_list_activity` `actor`, `entity_type`, `via`, `page` | Missing | Added; `list_activity` gained a `via` filter |
+
+**Deviation, kept deliberately:** the rate limiter is the existing in-memory
+sliding window, per process. §9 asked for a database-backed one. The container
+runs one uvicorn worker, so per-process is correct for the shipped deployment,
+exactly as the login limiter already is. It becomes wrong only if someone adds
+`--workers`; that is the moment to move it to the database.
+
+**Lesson:** the spec's tables are the checklist. "Tests pass" said nothing about
+parameters the tests never asked for. Phases 3 to 5 each end with a line-by-line
+check of their spec section before being called done.
+
+`scripts/mcp-smoke.sh` now boots a migrated database, mints a token by CLI, and
+drives `/mcp` over real HTTP with `scripts/mcp_smoke.py`. 212 backend tests.

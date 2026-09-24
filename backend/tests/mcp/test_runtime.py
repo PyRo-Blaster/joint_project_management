@@ -45,3 +45,16 @@ def test_the_refusal_says_how_to_get_a_token(db, admin):
     with pytest.raises(UnauthenticatedError) as caught:
         resolve_caller(db, {})
     assert "Bearer cmct_" in caught.value.message
+
+
+def test_calls_beyond_the_per_token_read_limit_are_refused(mcp_client, vocab):
+    from app.mcp import runtime
+    from app.services.rate_limit import SlidingWindowLimiter
+
+    runtime.LIMITERS["read"] = SlidingWindowLimiter(limit=2, window_seconds=60)
+    assert not mcp_client.call("cmc_whoami").get("isError")
+    assert not mcp_client.call("cmc_whoami").get("isError")
+    refused = mcp_client.call("cmc_whoami")
+    assert refused["isError"] is True
+    assert "Rate limit" in refused["content"][0]["text"]
+    assert "Test agent" in refused["content"][0]["text"]

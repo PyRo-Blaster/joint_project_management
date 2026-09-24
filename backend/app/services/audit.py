@@ -65,6 +65,7 @@ def list_activity(
     actor_id: int | None = None,
     entity_type: str | None = None,
     since: datetime | None = None,
+    via: str | None = None,
     page: int = 1,
     limit: int = 20,
 ) -> tuple[list[ActivityRow], int]:
@@ -79,6 +80,8 @@ def list_activity(
         stmt = stmt.where(AuditEvent.entity_type == entity_type)
     if since:
         stmt = stmt.where(AuditEvent.occurred_at >= since)
+    if via:
+        stmt = stmt.where(AuditEvent.via == via)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     ordered = stmt.order_by(AuditEvent.occurred_at.desc(), AuditEvent.id.desc())
     rows = db.execute(ordered.offset((page - 1) * limit).limit(limit)).all()

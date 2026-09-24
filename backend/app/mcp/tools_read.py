@@ -7,9 +7,12 @@ from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp.types import ToolAnnotations
 from pydantic import Field
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app import __version__
 from app.constants import (
+    ENTITY_TYPES,
     MAX_PAGE_LIMIT,
     OWNER_LABELS,
     OWNER_ORGS,
@@ -19,11 +22,21 @@ from app.constants import (
 )
 from app.mcp.render import changes_lines, event_line, item_detail, item_line, update_line
 from app.mcp.runtime import Caller, call_tool, call_unauthenticated
-from app.models import Program, User
+from app.mcp.validate import (
+    check_choice,
+    check_kind,
+    check_many,
+    check_owner_org,
+    check_priority,
+    check_status,
+    check_term,
+)
+from app.models import ActionItem, Program, User
 from app.services.audit import item_history, list_activity
 from app.services.dashboard import build_summary
 from app.services.errors import NotFoundError
 from app.services.items import (
+    SORTABLE,
     ItemFilters,
     get_item_by_entry_no,
     last_update_dates,
@@ -90,6 +103,10 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
             SEARCH_LIMIT_DEFAULT
         ),
         page: Annotated[int, Field(ge=1)] = 1,
+        sort: Annotated[
+            str, Field(description="entry_no, title, status, priority, due_on, raised_on, ...")
+        ] = "entry_no",
+        direction: Literal["asc", "desc"] = "asc",
     ) -> str:
         filters = dict(
             q=q,
@@ -104,7 +121,8 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
             due_after=due_after,
         )
         return await call_tool(
-            ctx, lambda db, caller, program: _search(db, program, filters, limit, page)
+            ctx,
+            lambda db, caller, program: _search(db, program, filters, limit, page, sort, direction),
         )
 
     @server.tool(
@@ -119,9 +137,15 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         ctx: Context,
         entry_no: Annotated[int, Field(description="The number people cite, as in '#42'")],
         include_updates: Annotated[int, Field(ge=0, le=50)] = 5,
+        include_history: Annotated[
+            bool, Field(description="Also return every recorded change, old to new")
+        ] = False,
     ) -> str:
         return await call_tool(
-            ctx, lambda db, caller, program: _get_item(db, program, entry_no, include_updates)
+            ctx,
+            lambda db, caller, program: _get_item(
+                db, program, entry_no, include_updates, include_history
+            ),
         )
 
     @server.tool(
@@ -133,9 +157,10 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         ctx: Context,
         entry_no: int,
         limit: Annotated[int, Field(ge=1, le=MAX_PAGE_LIMIT)] = 20,
+        page: Annotated[int, Field(ge=1)] = 1,
     ) -> str:
         return await call_tool(
-            ctx, lambda db, caller, program: _list_updates(db, program, entry_no, limit)
+            ctx, lambda db, caller, program: _list_updates(db, program, entry_no, limit, page)
         )
 
     @server.tool(
@@ -163,16 +188,21 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
             Literal["overdue", "due_soon", "stale", "all"],
             Field(description="Which list to return; 'all' returns each in turn"),
         ] = "all",
+        owner_org: Annotated[str | None, Field(description="gensci, yarrow or joint")] = None,
+        assignee_id: Annotated[int | None, Field(description="From cmc_list_vocabulary")] = None,
     ) -> str:
         return await call_tool(
-            ctx, lambda db, caller, program: _needs_attention(db, program, bucket)
+            ctx,
+            lambda db, caller, program: _needs_attention(
+                db, program, bucket, owner_org, assignee_id
+            ),
         )
 
     @server.tool(
         name="cmc_list_activity",
         description=(
             "Recent changes across the programme, newest first. Agent changes are marked "
-            "[agent]. Pass 'since' to see only what changed after a date."
+            "[agent]. Filter by date, person, kind of record, or source."
         ),
         annotations=READ_ONLY,
     )
@@ -180,9 +210,19 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         ctx: Context,
         since: Annotated[str | None, Field(description="ISO date, e.g. 2026-09-01")] = None,
         limit: Annotated[int, Field(ge=1, le=MAX_PAGE_LIMIT)] = ACTIVITY_LIMIT_DEFAULT,
+        page: Annotated[int, Field(ge=1)] = 1,
+        actor_id: Annotated[int | None, Field(description="Only this person's changes")] = None,
+        entity_type: Annotated[
+            str | None, Field(description="item, user, invitation, vocab_term, import, api_token")
+        ] = None,
+        via: Annotated[
+            Literal["web", "mcp", "cli"] | None,
+            Field(description="'mcp' shows only what agents changed"),
+        ] = None,
     ) -> str:
+        filters = dict(since=since, actor_id=actor_id, entity_type=entity_type, via=via)
         return await call_tool(
-            ctx, lambda db, caller, program: _activity(db, program, since, limit)
+            ctx, lambda db, caller, program: _activity(db, program, filters, limit, page)
         )
 
     @server.resource(
@@ -213,6 +253,7 @@ def _whoami(db: Session, caller: Caller, program: Program) -> str:
             f"Token: {caller.token.name} ({caller.token.prefix}) · Scopes: {scopes}",
             f"Write mode: {caller.token.write_mode}",
             f"Programme: {program.code} — {program.name}",
+            f"Server version: {__version__}",
             "",
             f"This server is read-only today{tail}",
         ]
@@ -257,20 +298,32 @@ def _as_date(value: str | None, field: str) -> date | None:
         raise ToolError(f"{field} must be an ISO date like 2026-10-01, not {value!r}") from exc
 
 
-def _search(db: Session, program: Program, raw: dict, limit: int, page: int) -> str:
+def _search(
+    db: Session,
+    program: Program,
+    raw: dict,
+    limit: int,
+    page: int,
+    sort: str = "entry_no",
+    direction: str = "asc",
+) -> str:
+    if sort not in SORTABLE:
+        raise ToolError(f"Cannot sort by {sort!r}. Sortable: {', '.join(sorted(SORTABLE))}.")
     filters = ItemFilters(
-        status=tuple(raw["status"] or ()),
-        priority=tuple(raw["priority"] or ()),
-        group=tuple(raw["group"] or ()),
-        category=tuple(raw["category"] or ()),
-        owner_org=tuple(raw["owner_org"] or ()),
-        kind=raw["kind"],
+        status=check_many(raw["status"], check_status),
+        priority=check_many(raw["priority"], check_priority),
+        group=check_many(raw["group"], lambda v: check_term(db, program.id, "group", v)),
+        category=check_many(raw["category"], lambda v: check_term(db, program.id, "category", v)),
+        owner_org=check_many(raw["owner_org"], check_owner_org),
+        kind=check_kind(raw["kind"]) if raw["kind"] else None,
         assignee_id=raw["assignee_id"],
         due_before=_as_date(raw["due_before"], "due_before"),
         due_after=_as_date(raw["due_after"], "due_after"),
         q=raw["q"],
     )
-    items, total = list_items(db, program.id, filters, page=page, limit=limit)
+    items, total = list_items(
+        db, program.id, filters, sort=sort, direction=direction, page=page, limit=limit
+    )
     if not items:
         return "No items match those filters. Try fewer of them, or cmc_list_vocabulary."
 
@@ -299,40 +352,77 @@ def _assignee(db: Session, item) -> User | None:
     return db.get(User, item.assignee_id) if item.assignee_id else None
 
 
-def _get_item(db: Session, program: Program, entry_no: int, include_updates: int) -> str:
+def _get_item(
+    db: Session,
+    program: Program,
+    entry_no: int,
+    include_updates: int,
+    include_history: bool = False,
+) -> str:
     item = _resolve(db, program, entry_no)
     updates = list_updates(db, item)[:include_updates] if include_updates else []
     text = item_detail(item, updates=updates, assignee=_assignee(db, item))
     total = len(list_updates(db, item))
     if include_updates and total > include_updates:
         text += f"\n  … {total - include_updates} older update(s); use cmc_list_updates."
+    if include_history:
+        text += "\n\nHistory:\n" + "\n".join(_history_lines(db, item))
     return text
 
 
-def _list_updates(db: Session, program: Program, entry_no: int, limit: int) -> str:
+def _list_updates(db: Session, program: Program, entry_no: int, limit: int, page: int = 1) -> str:
     item = _resolve(db, program, entry_no)
-    rows = list_updates(db, item)[:limit]
-    if not rows:
+    everything = list_updates(db, item)
+    if not everything:
         return f"#{item.entry_no} has no updates yet."
+    start = (page - 1) * limit
+    rows = everything[start : start + limit]
+    if not rows:
+        return f"#{item.entry_no} has only {len(everything)} update(s); page {page} is empty."
     header = f"#{item.entry_no} — {item.title}\nUpdates, newest first:"
-    return header + "\n" + "\n".join(f"  {update_line(u, author)}" for u, author in rows)
+    text = header + "\n" + "\n".join(f"  {update_line(u, author)}" for u, author in rows)
+    if start + limit < len(everything):
+        text += f"\nShowing {start + 1}–{start + len(rows)} of {len(everything)}. "
+        text += f"Pass page={page + 1} for older."
+    return text
+
+
+def _history_lines(db: Session, item) -> list[str]:
+    lines: list[str] = []
+    for event, actor in item_history(db, item.id):
+        lines.append(f"  {event_line(event, actor)}")
+        lines.extend(changes_lines(event))
+    return lines or ["  No recorded history."]
 
 
 def _history(db: Session, program: Program, entry_no: int) -> str:
     item = _resolve(db, program, entry_no)
-    rows = item_history(db, item.id)
-    if not rows:
+    if not item_history(db, item.id):
         return f"#{item.entry_no} has no recorded history."
-    lines = [f"#{item.entry_no} — {item.title}", "History, newest first:"]
-    for event, actor in rows:
-        lines.append(f"  {event_line(event, actor)}")
-        lines.extend(changes_lines(event))
-    return "\n".join(lines)
+    return "\n".join(
+        [f"#{item.entry_no} — {item.title}", "History, newest first:", *_history_lines(db, item)]
+    )
 
 
-def _needs_attention(db: Session, program: Program, bucket: str) -> str:
+def _needs_attention(
+    db: Session,
+    program: Program,
+    bucket: str,
+    owner_org: str | None = None,
+    assignee_id: int | None = None,
+) -> str:
     if bucket not in BUCKETS:
         raise ToolError(f"bucket must be one of {', '.join(BUCKETS)}, not {bucket!r}")
+    org = check_owner_org(owner_org) if owner_org else None
+    assigned: set[int] | None = None
+    if assignee_id is not None:
+        assigned = set(
+            db.scalars(
+                select(ActionItem.id).where(
+                    ActionItem.program_id == program.id, ActionItem.assignee_id == assignee_id
+                )
+            )
+        )
 
     from app.config import get_settings
 
@@ -353,8 +443,15 @@ def _needs_attention(db: Session, program: Program, bucket: str) -> str:
     wanted = BUCKETS[:-1] if bucket == "all" else [bucket]
 
     lines: list[str] = []
+
+    def keep(row) -> bool:
+        if org and row.owner_org != org:
+            return False
+        return assigned is None or row.id in assigned
+
     for key in wanted:
-        heading, rows = sections[key]
+        heading, all_rows = sections[key]
+        rows = [row for row in all_rows if keep(row)]
         lines.append(f"{heading} ({len(rows)}):")
         lines.extend(
             f"  #{row.entry_no} [{STATUS_LABELS.get(row.status or '', row.status or '')}"
@@ -369,21 +466,33 @@ def _needs_attention(db: Session, program: Program, bucket: str) -> str:
     return "\n".join(lines).rstrip()
 
 
-def _activity(db: Session, program: Program, since: str | None, limit: int) -> str:
-    since_date = _as_date(since, "since")
+def _activity(db: Session, program: Program, raw: dict, limit: int, page: int = 1) -> str:
+    since_date = _as_date(raw["since"], "since")
+    entity_type = raw["entity_type"]
+    if entity_type:
+        entity_type = check_choice(entity_type, ENTITY_TYPES, "record type")
+    # Programme-scoped by default, but token and user events carry no programme,
+    # so filtering on those types has to look programme-wide.
+    scoped = entity_type not in {"api_token", "user", "invitation"}
     rows, total = list_activity(
         db,
-        program_id=program.id,
+        program_id=program.id if scoped else None,
+        actor_id=raw["actor_id"],
+        entity_type=entity_type,
+        via=raw["via"],
         since=None if since_date is None else _midnight(since_date),
-        page=1,
+        page=page,
         limit=limit,
     )
     if not rows:
-        return "No activity in that window."
-    lines = [f"{len(rows)} of {total} recent changes, newest first:"]
+        return "No activity matches those filters."
+    first = (page - 1) * limit + 1
+    lines = [f"Changes {first}–{first + len(rows) - 1} of {total}, newest first:"]
     for event, actor in rows:
         lines.append(f"  {event_line(event, actor)}")
         lines.extend(changes_lines(event))
+    if first + len(rows) - 1 < total:
+        lines.append(f"Pass page={page + 1} for older changes.")
     return "\n".join(lines)
 
 

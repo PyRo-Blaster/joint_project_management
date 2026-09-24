@@ -128,3 +128,105 @@ def test_the_briefing_resource_explains_the_conventions(mcp_client, vocab):
     assert "GS098" in text
     assert "General Issues" in text
     assert "note" in text.lower()
+
+
+# --- Phase 2 completion: parameters the spec lists that the first cut omitted ------
+
+
+def test_whoami_reports_the_server_version(mcp_client):
+    from app import __version__
+
+    assert f"Server version: {__version__}" in mcp_client.text("cmc_whoami")
+
+
+def test_search_rejects_an_unknown_status_naming_the_valid_ones(mcp_client, vocab):
+    result = mcp_client.call("cmc_search_items", status=["done"])
+    assert result["isError"] is True
+    assert 'Did you mean "completed"?' in result["content"][0]["text"]
+
+
+def test_search_rejects_an_unknown_group(mcp_client, vocab):
+    result = mcp_client.call("cmc_search_items", group=["Nonsense group"])
+    assert result["isError"] is True
+    assert "General Issues" in result["content"][0]["text"]
+
+
+def test_search_sorts(mcp_client, cli_db, program, admin, vocab):
+    make_item(cli_db, program, admin, title="Alpha item", due_on=date(2026, 12, 1))
+    make_item(cli_db, program, admin, title="Beta item", due_on=date(2026, 10, 1))
+    text = mcp_client.text("cmc_search_items", sort="due_on", direction="asc")
+    assert text.index("Beta item") < text.index("Alpha item")
+
+
+def test_search_rejects_an_unsortable_field(mcp_client, vocab):
+    result = mcp_client.call("cmc_search_items", sort="colour")
+    assert result["isError"] is True
+    assert "due_on" in result["content"][0]["text"]
+
+
+def test_get_item_can_include_history(mcp_client, cli_db, program, admin, vocab):
+    item = make_item(cli_db, program, admin)
+    patch_item(cli_db, actor=admin, item=item, patch=ItemPatch(status="blocked"))
+    without = mcp_client.text("cmc_get_item", entry_no=item.entry_no)
+    with_history = mcp_client.text("cmc_get_item", entry_no=item.entry_no, include_history=True)
+    assert "History:" not in without
+    assert "History:" in with_history
+    assert "blocked" in with_history
+
+
+def test_list_updates_pages(mcp_client, cli_db, program, admin, vocab):
+    item = make_item(cli_db, program, admin)
+    for day in range(1, 4):
+        create_update(
+            cli_db, actor=admin, item=item, body=f"Update {day}", occurred_on=date(2026, 3, day)
+        )
+    first = mcp_client.text("cmc_list_updates", entry_no=item.entry_no, limit=2, page=1)
+    second = mcp_client.text("cmc_list_updates", entry_no=item.entry_no, limit=2, page=2)
+    assert "Update 3" in first and "Update 1" not in first
+    assert "Update 1" in second
+    assert "page=2" in first
+
+
+def test_needs_attention_filters_by_owner_org(mcp_client, cli_db, program, admin, vocab):
+    late = date.today() - timedelta(days=3)
+    make_item(cli_db, program, admin, title="GenSci late", owner_org="gensci", due_on=late)
+    make_item(cli_db, program, admin, title="Yarrow late", owner_org="yarrow", due_on=late)
+    text = mcp_client.text("cmc_needs_attention", owner_org="yarrow")
+    assert "Yarrow late" in text
+    assert "GenSci late" not in text
+
+
+def test_needs_attention_filters_by_assignee(mcp_client, cli_db, program, admin, member, vocab):
+    late = date.today() - timedelta(days=3)
+    make_item(cli_db, program, admin, title="Mo's late one", assignee_id=member.id, due_on=late)
+    make_item(cli_db, program, admin, title="Unassigned late one", due_on=late)
+    text = mcp_client.text("cmc_needs_attention", assignee_id=member.id)
+    assert "Mo's late one" in text
+    assert "Unassigned late one" not in text
+
+
+def test_list_activity_filters_by_actor_type_and_source(
+    mcp_client, cli_db, program, admin, member, vocab
+):
+    from app.services.principal import Principal, set_principal
+
+    item = make_item(cli_db, program, admin)
+    patch_item(cli_db, actor=admin, item=item, patch=ItemPatch(priority="p1"))
+    set_principal(cli_db, Principal(via="mcp", token_name="Bot"))
+    patch_item(cli_db, actor=member, item=item, patch=ItemPatch(priority="p3"))
+
+    by_member = mcp_client.text("cmc_list_activity", actor_id=member.id)
+    assert member.name in by_member and admin.name not in by_member
+
+    agents = mcp_client.text("cmc_list_activity", via="mcp")
+    assert "[agent]" in agents and admin.name not in agents
+
+    tokens_only = mcp_client.text("cmc_list_activity", entity_type="api_token")
+    assert "created API token" in tokens_only
+
+
+def test_list_activity_pages(mcp_client, cli_db, program, admin, vocab):
+    item = make_item(cli_db, program, admin)
+    for priority in ("p1", "p3", "p1"):
+        patch_item(cli_db, actor=admin, item=item, patch=ItemPatch(priority=priority))
+    assert "page=2" in mcp_client.text("cmc_list_activity", limit=2)

@@ -57,6 +57,15 @@ class McpClient:
         return "\n".join(part.get("text", "") for part in result["contents"])
 
 
+@pytest.fixture(autouse=True)
+def _fresh_rate_limits():
+    from app.mcp import runtime
+
+    runtime.LIMITERS.clear()
+    yield
+    runtime.LIMITERS.clear()
+
+
 @pytest.fixture
 def mcp_client(app, cli_db, admin):
     """A live client holding a read token for the seeded admin.

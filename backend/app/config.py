@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     mcp_token_ttl_days: int = 90
     mcp_enabled: bool = True
     mcp_allowed_hosts: str = ""
+    mcp_rate_reads_per_min: int = 600
+    mcp_rate_writes_per_min: int = 60
     due_soon_days: int = 14
     stale_days: int = 14
     login_attempts_per_minute: int = 5
