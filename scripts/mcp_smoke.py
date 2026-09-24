@@ -161,7 +161,7 @@ def main() -> int:
     error, text = call("cmc_whoami", headers=anonymous)
     check("no token is refused with instructions", error and "Bearer cmct_" in text, text)
     error, text = call("cmc_whoami", headers={**HEADERS, "Authorization": "Bearer cmct_x"})
-    check("bad token is refused", error and "revoked" in text, text)
+    check("bad token is refused", error and "not recognised" in text, text)
 
     print("REST is read-only to tokens")
     request = urllib.request.Request(

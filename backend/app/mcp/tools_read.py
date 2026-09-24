@@ -291,18 +291,9 @@ def _vocabulary(db: Session, caller: Caller, program: Program) -> str:
     )
 
 
-def _search(
-    db: Session,
-    program: Program,
-    raw: dict,
-    limit: int,
-    page: int,
-    sort: str = "entry_no",
-    direction: str = "asc",
-) -> str:
-    if sort not in SORTABLE:
-        raise ToolError(f"Cannot sort by {sort!r}. Sortable: {', '.join(sorted(SORTABLE))}.")
-    filters = ItemFilters(
+def build_filters(db: Session, program: Program, raw: dict) -> ItemFilters:
+    """Validate an agent's search filters into ItemFilters; shared with the export tool."""
+    return ItemFilters(
         status=check_many(raw["status"], check_status),
         priority=check_many(raw["priority"], check_priority),
         group=check_many(raw["group"], lambda v: check_term(db, program.id, "group", v)),
@@ -314,6 +305,20 @@ def _search(
         due_after=parse_date(raw["due_after"], "due_after"),
         q=raw["q"],
     )
+
+
+def _search(
+    db: Session,
+    program: Program,
+    raw: dict,
+    limit: int,
+    page: int,
+    sort: str = "entry_no",
+    direction: str = "asc",
+) -> str:
+    if sort not in SORTABLE:
+        raise ToolError(f"Cannot sort by {sort!r}. Sortable: {', '.join(sorted(SORTABLE))}.")
+    filters = build_filters(db, program, raw)
     items, total = list_items(
         db, program.id, filters, sort=sort, direction=direction, page=page, limit=limit
     )
