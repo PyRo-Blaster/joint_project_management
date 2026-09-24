@@ -1,6 +1,7 @@
 """Application settings loaded from environment variables (and .env for local runs)."""
 
 from functools import lru_cache
+from typing import Literal
 
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
     mcp_rate_writes_per_min: int = 60
     mcp_writes_enabled: bool = True
     idempotency_ttl_hours: int = 24
+    mcp_default_write_mode: Literal["append", "interactive"] = "interactive"
     due_soon_days: int = 14
     stale_days: int = 14
     login_attempts_per_minute: int = 5

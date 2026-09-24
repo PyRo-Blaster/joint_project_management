@@ -95,3 +95,14 @@ def test_a_bearer_token_cannot_manage_tokens(app, db, admin):
 
     assert client.post("/api/tokens", json={"name": "Escalated"}).status_code == 403
     assert client.get("/api/tokens").status_code == 403
+
+
+def test_the_default_write_mode_comes_from_settings(app, admin, monkeypatch):
+    from app.config import get_settings
+
+    monkeypatch.setattr(get_settings(), "mcp_default_write_mode", "append")
+    client = login_client(app, admin.email, ADMIN_PASSWORD)
+    record = client.post("/api/tokens", json={"name": "Nightly"}).json()["data"]["record"]
+    assert record["write_mode"] == "append"
+    explicit = client.post("/api/tokens", json={"name": "Chat", "write_mode": "interactive"})
+    assert explicit.json()["data"]["record"]["write_mode"] == "interactive"

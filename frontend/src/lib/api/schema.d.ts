@@ -1142,12 +1142,8 @@ export interface components {
              *     ]
              */
             scopes: ("read" | "write")[];
-            /**
-             * Write Mode
-             * @default interactive
-             * @enum {string}
-             */
-            write_mode: "append" | "interactive";
+            /** Write Mode */
+            write_mode?: ("append" | "interactive") | null;
             /** User Id */
             user_id?: number | null;
             /** Ttl Days */

@@ -8,6 +8,7 @@ JSON-RPC over plain HTTP so it tests the real transport, not the test client.
 
 import json
 import sys
+import urllib.error
 import urllib.request
 
 BASE, TOKEN = sys.argv[1].rstrip("/"), sys.argv[2]
@@ -74,12 +75,46 @@ def main() -> int:
     error, text = call("cmc_list_activity", entity_type="api_token")
     check("activity filters by record type", not error and "API token" in text, text)
 
+    print("open writes (phase 3)")
+    for expected in ("cmc_post_update", "cmc_create_item"):
+        check(f"lists {expected}", expected in names)
+    new = {"title": "Smoke test extractables scope", "group": "General Issues", "owner_org": "gensci"}
+    error, text = call("cmc_create_item", **new, dry_run=True)
+    check("create dry run files nothing", not error and "Dry run" in text, text)
+    error, text = call("cmc_create_item", **new, idempotency_key="smoke-1")
+    check("create files an unreviewed item", not error and "unreviewed" in text, text)
+    error, text = call("cmc_create_item", **new, idempotency_key="smoke-1")
+    check("idempotent retry replays", not error and "Already filed" in text, text)
+    error, text = call("cmc_create_item", **{**new, "title": new["title"] + "."})
+    check("near duplicate is refused", error and "confirm_new" in text, text)
+    error, text = call("cmc_create_item", **{**new, "group": "Gen2 CMC"})
+    check("unknown group names active ones", error and "Gen2 (Process 2.0) CMC" in text, text)
+    error, text = call("cmc_create_item", **new, kind="note", status="open", confirm_new=True)
+    check("note with a status is refused", error and "Notes have no status" in text, text)
+    error, text = call("cmc_post_update", entry_no=1, body="Smoke progress note")
+    check("post update appends", not error and "Posted an update on #1" in text, text)
+    error, text = call("cmc_get_item_history", entry_no=1)
+    check("history marks the agent", not error and "[agent]" in text, text)
+
     print("auth")
     anonymous = {key: value for key, value in HEADERS.items() if key != "Authorization"}
     error, text = call("cmc_whoami", headers=anonymous)
     check("no token is refused with instructions", error and "Bearer cmct_" in text, text)
     error, text = call("cmc_whoami", headers={**HEADERS, "Authorization": "Bearer cmct_x"})
     check("bad token is refused", error and "revoked" in text, text)
+
+    print("REST is read-only to tokens")
+    request = urllib.request.Request(
+        f"{BASE}/api/items",
+        data=json.dumps({"title": "x", "group": "General Issues", "owner_org": "gensci"}).encode(),
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {TOKEN}"},
+        method="POST",
+    )
+    try:
+        urllib.request.urlopen(request, timeout=20)
+        check("a write token cannot POST to /api", False, "request succeeded")
+    except urllib.error.HTTPError as refused:
+        check("a write token cannot POST to /api", refused.code == 403, str(refused.code))
 
     if failures:
         print(f"\n{len(failures)} failure(s):")
