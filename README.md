@@ -102,8 +102,11 @@ to a real user and acts as that person, so the permission model and the audit
 trail are unchanged; every change it makes is recorded with its source and the
 token's name, which the activity feed and item history show.
 
-- **Scopes.** A token is `read`, or `read,write`. A read token is refused on any
-  mutating request. There is no admin scope.
+- **Scopes.** A token is `read`, or `read,write`. There is no admin scope.
+- **The REST API is read-only to every token.** A token on any `POST`, `PATCH`,
+  or `DELETE` under `/api` gets 403. Agents write only through the MCP endpoint
+  at `/mcp`, where the guardrails live: no delete, no identity fields, and
+  confirm-before-edit. The `write` scope governs what a token may do there.
 - **Managing tokens** needs a browser session, at **API tokens** in the sidebar.
   A token can never create or revoke another, so it cannot escalate itself.
   Members manage their own; admins see everyone's.
