@@ -26,6 +26,7 @@ DATES_ONLY_FOR_REPORT = (
 
 def register(server: MCPServer) -> None:
     @server.tool(
+        structured_output=False,
         name="cmc_export_workbook",
         description=(
             "An Excel workbook of the items matching the same filters as cmc_search_items, "

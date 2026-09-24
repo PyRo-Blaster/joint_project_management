@@ -63,3 +63,18 @@ def test_search_output_stays_compact(mcp_client, cli_db, program, admin, vocab):
     assert len(lines) <= 27  # 25 rows, a blank line and a footer
     assert max(len(line) for line in lines) < 200
     assert "Background" not in "\n".join(lines)
+
+
+def test_results_carry_the_text_once(mcp_client, vocab):
+    # The SDK would otherwise repeat a str result as structuredContent, doubling it.
+    result = mcp_client.call("cmc_list_vocabulary")
+    assert "structuredContent" not in result
+    assert all("outputSchema" not in tool for tool in mcp_client.list_tools())
+
+
+def test_history_hides_internal_update_ids(mcp_writer, cli_db, program, admin, vocab):
+    item = make_item(cli_db, program, admin)
+    mcp_writer.text("cmc_post_update", entry_no=item.entry_no, body="Checked with QC")
+    history = mcp_writer.text("cmc_get_item_history", entry_no=item.entry_no)
+    assert "posted an update" in history
+    assert "update_id" not in history

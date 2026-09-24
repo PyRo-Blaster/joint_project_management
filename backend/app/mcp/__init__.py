@@ -31,6 +31,9 @@ cmc_export_workbook returns a short-lived download link for a person, not the fi
 
 
 def build_mcp_server() -> MCPServer:
+    """Every tool returns text only (``structured_output=False``). Left on, the SDK
+    repeats a ``str`` result verbatim as ``structuredContent``, doubling each
+    response for no gain."""
     from app.mcp import prompts, tools_edit, tools_export, tools_read, tools_write
     from app.mcp.strict_args import StrictArguments
 

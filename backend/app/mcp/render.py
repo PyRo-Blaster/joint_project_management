@@ -49,10 +49,15 @@ def event_line(event: AuditEvent, actor: User) -> str:
     return f"{when}{source} {actor.name}: {event.summary}{undone}"
 
 
+# Internal references an agent cannot act on; the summary already says what happened.
+HIDDEN_CHANGE_FIELDS = frozenset({"update_id"})
+
+
 def changes_lines(event: AuditEvent) -> list[str]:
     return [
         f"    {field}: {change.get('old')!r} → {change.get('new')!r}"
         for field, change in (event.changes or {}).items()
+        if field not in HIDDEN_CHANGE_FIELDS
     ]
 
 

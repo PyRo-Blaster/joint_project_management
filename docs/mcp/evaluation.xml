@@ -1,0 +1,49 @@
+<!--
+  Ten read-only questions for evaluating an agent against the tracker's MCP
+  server (design section 11). Load the fictional dataset into an empty
+  programme first:  python -m app.cli seed-eval
+  Every answer is fixed by backend/app/evaluation/seed.py, and
+  backend/tests/eval proves each one through the MCP tools in CI.
+-->
+<evaluation>
+  <qa_pair>
+    <question>A colleague writes: "The replacement SEC-HPLC column has now passed requalification." Which item should that update be posted on? Answer with its entry number, as #N.</question>
+    <answer>#6</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>On what date did the person assigned to the SEC-HPLC column failure item report its root cause? Answer as YYYY-MM-DD.</question>
+    <answer>2026-05-27</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Among the GenSci-owned P1 actions that are overdue, take the one with the earliest due date. Who is assigned to it? Answer with the person's full name.</question>
+    <answer>Mei Zhang</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>The SEC-HPLC column failure item was blocked at one point. What is its status now? Answer with the status value the tracker uses, such as open.</question>
+    <answer>in_progress</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many P1 actions that are neither completed nor cancelled have a due date on or before 2026-06-30? Answer with a number.</question>
+    <answer>5</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Who moved the SEC-HPLC column failure item from blocked to in progress? Answer with the person's full name.</question>
+    <answer>Harriet Okafor</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>How many actions, not counting notes, are in the group "Gen2 (Process 2.0) CMC"? Answer with a number.</question>
+    <answer>3</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>An agent posted a weekly digest update on the SEC-HPLC column failure item. What is the name of the API token it wrote through?</question>
+    <answer>Weekly digest bot</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>Is "Formulation" a valid group in this programme? Answer True or False.</question>
+    <answer>False</answer>
+  </qa_pair>
+  <qa_pair>
+    <question>What is the due date of the only Yarrow-owned action that is in progress and is not P1? Answer as YYYY-MM-DD.</question>
+    <answer>2026-11-20</answer>
+  </qa_pair>
+</evaluation>

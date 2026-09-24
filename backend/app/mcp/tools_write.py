@@ -42,6 +42,7 @@ OPEN_WRITE = ToolAnnotations(readOnlyHint=False, destructiveHint=False, idempote
 
 def register(server: MCPServer) -> None:
     @server.tool(
+        structured_output=False,
         name="cmc_post_update",
         description=(
             "Append a dated progress note to an item's timeline — what the spreadsheet's "
@@ -70,6 +71,7 @@ def register(server: MCPServer) -> None:
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_create_item",
         description=(
             "File a new action item or note. Refuses when an existing item has a very "
