@@ -35,9 +35,13 @@ def get_current_user(request: Request, db: DbDep, settings: SettingsDep) -> User
         api_token = resolve_token(db, raw_token)
         if api_token is None:
             raise UnauthenticatedError("Invalid, expired, or revoked API token")
-        if request.method in MUTATING_METHODS and "write" not in api_token.scope_set:
+        if request.method in MUTATING_METHODS:
+            # Agent writes go through /mcp, where the guardrails live: no delete, no
+            # identity fields, confirm-before-edit. Letting a token write here would
+            # bypass all of them, so the REST API is read-only to every token.
             raise ForbiddenError(
-                f"Token '{api_token.name}' has scope {api_token.scopes}; this needs 'write'"
+                f"API tokens can only read the REST API; token '{api_token.name}' cannot "
+                "change anything here. Agents write through the MCP endpoint at /mcp."
             )
         request.state.api_token = api_token
         set_principal(db, Principal(via="mcp", token_name=api_token.name))

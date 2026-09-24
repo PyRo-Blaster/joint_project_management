@@ -33,26 +33,36 @@ def test_a_read_token_cannot_write(app, db, admin, vocab):
     assert response.status_code == 403
     body = response.json()["error"]
     assert body["code"] == "forbidden"
-    assert "write" in body["message"]
+    assert "/mcp" in body["message"]
 
 
-def test_a_write_token_can_write_and_the_audit_row_names_it(app, db, admin, vocab):
+def test_even_a_write_token_cannot_write_through_the_rest_api(app, db, admin, vocab):
+    """Agent writes go through /mcp, where the guardrails are.
+
+    Phase 1 let a write token POST/PATCH/DELETE here directly, which bypassed
+    them: an agent could soft-delete an item or rewrite its owner.
+    """
     _, raw = create_token(
         db, actor=admin, owner=admin, name="Claude Code", scopes=["read", "write"]
     )
-    response = bearer(app, raw).post("/api/items", json=NEW_ITEM)
-    assert response.status_code == 201, response.text
-    item_id = response.json()["data"]["id"]
+    client = bearer(app, raw)
+    response = client.post("/api/items", json=NEW_ITEM)
+    assert response.status_code == 403
+    assert "/mcp" in response.json()["error"]["message"]
+    assert db.query(ActionItem).count() == 0
 
-    event = (
-        db.query(AuditEvent)
-        .filter(AuditEvent.entity_type == "item", AuditEvent.entity_id == item_id)
-        .one()
-    )
-    assert event.via == "mcp"
-    assert event.token_name == "Claude Code"
-    assert event.actor_id == admin.id
-    assert db.get(ActionItem, item_id).created_by == admin.id
+
+def test_a_write_token_cannot_delete_through_the_rest_api(app, db, admin, vocab):
+    from tests.conftest import ADMIN_PASSWORD as PASSWORD
+
+    person = login_client(app, admin.email, PASSWORD)
+    item_id = person.post("/api/items", json=NEW_ITEM).json()["data"]["id"]
+    _, raw = create_token(db, actor=admin, owner=admin, name="Writer", scopes=["read", "write"])
+
+    assert bearer(app, raw).delete(f"/api/items/{item_id}").status_code == 403
+    assert bearer(app, raw).patch(f"/api/items/{item_id}", json={"title": "x"}).status_code == 403
+    db.expire_all()
+    assert db.get(ActionItem, item_id).deleted_at is None
 
 
 def test_a_cookie_write_is_still_recorded_as_web(app, db, admin, vocab):
