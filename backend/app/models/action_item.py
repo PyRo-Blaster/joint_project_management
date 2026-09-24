@@ -25,6 +25,7 @@ class ActionItem(CreatedAtMixin, Base):
     __tablename__ = "action_item"
     __table_args__ = (
         UniqueConstraint("program_id", "entry_no"),
+        UniqueConstraint("program_id", "idempotency_key"),
         check_in("kind", KINDS),
         check_in("owner_org", OWNER_ORGS),
         check_in("status", STATUSES, nullable=True),
@@ -61,6 +62,12 @@ class ActionItem(CreatedAtMixin, Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=utcnow)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     deleted_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"), nullable=True)
+    # A retry of the same agent create returns the original instead of filing again.
+    idempotency_key: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    # When a person last confirmed the agent's work on this item. Whether an agent has
+    # touched it since is read from audit_event, so it is not stored twice.
+    agent_ack_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    agent_ack_by: Mapped[int | None] = mapped_column(ForeignKey("app_user.id"), nullable=True)
 
     updates: Mapped[list["ItemUpdate"]] = relationship(
         back_populates="item",

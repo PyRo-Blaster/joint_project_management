@@ -30,6 +30,7 @@ AuditAction = Literal[
     "revoked",
     "reset_link_issued",
     "imported",
+    "acknowledged",
 ]
 
 ORGS: tuple[str, ...] = get_args(Org)

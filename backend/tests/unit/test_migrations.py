@@ -109,3 +109,72 @@ def test_downgrade_clears_token_audit_rows_so_the_old_constraint_fits(tmp_path):
     with engine.begin() as conn:
         kinds = [row[0] for row in conn.execute(text("SELECT entity_type FROM audit_event"))]
     assert kinds == ["user"]
+
+
+def _user_row() -> str:
+    return (
+        "INSERT INTO app_user (id, email, name, password_hash, org, role, is_active, "
+        "created_at) VALUES (1, 'a@b.c', 'A', 'x', 'gensci', 'admin', 1, "
+        "'2026-09-21 10:00:00')"
+    )
+
+
+def _action_row(action: str) -> str:
+    return (
+        "INSERT INTO audit_event (program_id, entity_type, entity_id, action, actor_id, "
+        f"occurred_at, changes, summary, via) VALUES (NULL, 'item', 1, '{action}', 1, "
+        "'2026-09-24 10:00:00', '{}', 'x', 'web')"
+    )
+
+
+def test_0003_accepts_the_acknowledged_action_and_review_columns(tmp_path):
+    url = f"sqlite:///{tmp_path / 'm3.db'}"
+    command.upgrade(_config(url), "0003")
+    engine = create_engine(url)
+    columns = {c["name"] for c in inspect(engine).get_columns("action_item")}
+    assert {"idempotency_key", "agent_ack_at", "agent_ack_by"} <= columns
+    with engine.begin() as conn:
+        conn.execute(text(_user_row()))
+        conn.execute(text(_action_row("acknowledged")))
+
+
+def test_0003_enforces_one_idempotency_key_per_programme(tmp_path):
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    url = f"sqlite:///{tmp_path / 'm3u.db'}"
+    command.upgrade(_config(url), "0003")
+    engine = create_engine(url)
+    item = (
+        "INSERT INTO action_item (program_id, entry_no, kind, title, details, group_name, "
+        "owner_org, status, raised_on, notes_risks, file_path, created_by, updated_by, "
+        "updated_at, created_at, idempotency_key) VALUES (1, {n}, 'action', 't', '', 'g', "
+        "'gensci', 'open', '2026-09-24', '', '', 1, 1, '2026-09-24', '2026-09-24', {key})"
+    )
+    with engine.begin() as conn:
+        conn.execute(text(_user_row()))
+        conn.execute(text("INSERT INTO program (id, code, name, created_at) "
+                          "VALUES (1, 'GS098', 'P', '2026-09-24')"))
+        conn.execute(text(item.format(n=1, key="NULL")))
+        conn.execute(text(item.format(n=2, key="NULL")))
+        conn.execute(text(item.format(n=3, key="'k-1'")))
+    with pytest.raises(IntegrityError), engine.begin() as conn:
+        conn.execute(text(item.format(n=4, key="'k-1'")))
+
+
+def test_0003_downgrade_clears_acknowledged_rows(tmp_path):
+    url = f"sqlite:///{tmp_path / 'm3d.db'}"
+    cfg = _config(url)
+    command.upgrade(cfg, "0003")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text(_user_row()))
+        conn.execute(text(_action_row("acknowledged")))
+        conn.execute(text(_action_row("updated")))
+    engine.dispose()
+    command.downgrade(cfg, "0002")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        actions = [row[0] for row in conn.execute(text("SELECT action FROM audit_event"))]
+    assert actions == ["updated"]
+    assert "idempotency_key" not in {c["name"] for c in inspect(engine).get_columns("action_item")}

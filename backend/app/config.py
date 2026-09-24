@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     mcp_allowed_hosts: str = ""
     mcp_rate_reads_per_min: int = 600
     mcp_rate_writes_per_min: int = 60
+    mcp_writes_enabled: bool = True
+    idempotency_ttl_hours: int = 24
     due_soon_days: int = 14
     stale_days: int = 14
     login_attempts_per_minute: int = 5
