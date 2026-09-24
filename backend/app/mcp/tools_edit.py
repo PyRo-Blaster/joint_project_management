@@ -72,6 +72,7 @@ class Planned:
 
 def register(server: MCPServer) -> None:
     @server.tool(
+        structured_output=False,
         name="cmc_set_status",
         description=(
             "Change an action's status, optionally with a timeline note saying why. Two calls: "
@@ -96,6 +97,7 @@ def register(server: MCPServer) -> None:
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_update_item",
         description=(
             "Change an item's live state: due date, priority, category, assignee, details, "
@@ -138,6 +140,7 @@ def register(server: MCPServer) -> None:
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_apply_batch",
         description=(
             f"Apply up to {MAX_BATCH} changes as one transaction: status and field changes "

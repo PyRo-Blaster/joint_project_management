@@ -152,6 +152,19 @@ def export_excel(out: Annotated[Path, typer.Argument(dir_okay=False)]) -> None:
     typer.echo(f"wrote {out}")
 
 
+@cli.command("seed-eval")
+def seed_eval() -> None:
+    """Load the fictional evaluation dataset (docs/mcp/evaluation.xml) into an empty programme."""
+    from app.evaluation.seed import seed_evaluation
+
+    with session_scope() as db:
+        try:
+            count = seed_evaluation(db, actor=_actor(db, None), program=_program(db))
+        except DomainError as exc:
+            raise typer.BadParameter(exc.message) from exc
+    typer.echo(f"seeded {count} evaluation items")
+
+
 token_cli = typer.Typer(help="Manage API tokens for agents", no_args_is_help=True)
 cli.add_typer(token_cli, name="token")
 

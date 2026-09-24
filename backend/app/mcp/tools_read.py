@@ -55,6 +55,7 @@ BUCKETS = ("overdue", "due_soon", "stale", "all")
 
 def register(server: MCPServer) -> None:  # noqa: C901 - one registration per tool
     @server.tool(
+        structured_output=False,
         name="cmc_whoami",
         description=(
             "Who this token acts as, what it may do, and which programme it reaches. "
@@ -66,6 +67,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         return await call_tool(ctx, _whoami)
 
     @server.tool(
+        structured_output=False,
         name="cmc_list_vocabulary",
         description=(
             "Every valid value in one call: groups, categories, statuses, priorities, "
@@ -78,6 +80,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         return await call_tool(ctx, _vocabulary)
 
     @server.tool(
+        structured_output=False,
         name="cmc_search_items",
         description=(
             "Find items, one compact line each. Combine filters freely; omit them all to "
@@ -124,6 +127,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_get_item",
         description=(
             "The full record of one item by its entry number, with its most recent updates. "
@@ -147,6 +151,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_list_updates",
         description="The dated timeline of one item, newest first, with each author.",
         annotations=READ_ONLY,
@@ -162,6 +167,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_get_item_history",
         description=(
             "Who changed what on one item and when, with the old and new value of every "
@@ -173,6 +179,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         return await call_tool(ctx, lambda db, caller, program: _history(db, program, entry_no))
 
     @server.tool(
+        structured_output=False,
         name="cmc_needs_attention",
         description=(
             "Items that need someone: overdue, due soon, or open but stale with no recent "
@@ -197,6 +204,7 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         )
 
     @server.tool(
+        structured_output=False,
         name="cmc_list_activity",
         description=(
             "Recent changes across the programme, newest first. Agent changes are marked "
