@@ -20,6 +20,7 @@ from app.constants import (
     STATUS_LABELS,
     STATUSES,
 )
+from app.mcp.lookup import parse_date, resolve_item
 from app.mcp.render import changes_lines, event_line, item_detail, item_line, update_line
 from app.mcp.runtime import Caller, call_tool, call_unauthenticated
 from app.mcp.validate import (
@@ -34,14 +35,11 @@ from app.mcp.validate import (
 from app.models import ActionItem, Program, User
 from app.services.audit import item_history, list_activity
 from app.services.dashboard import build_summary
-from app.services.errors import NotFoundError
 from app.services.items import (
     SORTABLE,
     ItemFilters,
-    get_item_by_entry_no,
     last_update_dates,
     list_items,
-    next_entry_no,
 )
 from app.services.updates import list_updates
 from app.services.users import list_users
@@ -241,11 +239,12 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
 def _whoami(db: Session, caller: Caller, program: Program) -> str:
     scopes = ", ".join(sorted(caller.token.scope_set))
     may_write = "write" in caller.token.scope_set
-    tail = (
-        "; the write tools arrive in a later release."
-        if may_write
-        else ", and this token has no write scope in any case."
-    )
+    if not may_write:
+        ability = "It can read only: this token has no write scope."
+    elif caller.token.write_mode == "append":
+        ability = "It can post updates and file items, but never edit one (append mode)."
+    else:
+        ability = "It can post updates and file items. Nothing can delete."
     return "\n".join(
         [
             f"Acting as {caller.user.name} <{caller.user.email}>",
@@ -255,7 +254,7 @@ def _whoami(db: Session, caller: Caller, program: Program) -> str:
             f"Programme: {program.code} — {program.name}",
             f"Server version: {__version__}",
             "",
-            f"This server is read-only today{tail}",
+            ability,
         ]
     )
 
@@ -289,15 +288,6 @@ def _vocabulary(db: Session, caller: Caller, program: Program) -> str:
     )
 
 
-def _as_date(value: str | None, field: str) -> date | None:
-    if not value:
-        return None
-    try:
-        return date.fromisoformat(value)
-    except ValueError as exc:
-        raise ToolError(f"{field} must be an ISO date like 2026-10-01, not {value!r}") from exc
-
-
 def _search(
     db: Session,
     program: Program,
@@ -317,8 +307,8 @@ def _search(
         owner_org=check_many(raw["owner_org"], check_owner_org),
         kind=check_kind(raw["kind"]) if raw["kind"] else None,
         assignee_id=raw["assignee_id"],
-        due_before=_as_date(raw["due_before"], "due_before"),
-        due_after=_as_date(raw["due_after"], "due_after"),
+        due_before=parse_date(raw["due_before"], "due_before"),
+        due_after=parse_date(raw["due_after"], "due_after"),
         q=raw["q"],
     )
     items, total = list_items(
@@ -337,17 +327,6 @@ def _search(
     return "\n".join(lines) + footer
 
 
-def _resolve(db: Session, program: Program, entry_no: int):
-    try:
-        return get_item_by_entry_no(db, program.id, entry_no)
-    except NotFoundError as exc:
-        highest = next_entry_no(db, program.id) - 1
-        raise ToolError(
-            f"No item #{entry_no} in {program.code}. The highest entry number is {highest}. "
-            "Use cmc_search_items to find it by title."
-        ) from exc
-
-
 def _assignee(db: Session, item) -> User | None:
     return db.get(User, item.assignee_id) if item.assignee_id else None
 
@@ -359,7 +338,7 @@ def _get_item(
     include_updates: int,
     include_history: bool = False,
 ) -> str:
-    item = _resolve(db, program, entry_no)
+    item = resolve_item(db, program, entry_no)
     updates = list_updates(db, item)[:include_updates] if include_updates else []
     text = item_detail(item, updates=updates, assignee=_assignee(db, item))
     total = len(list_updates(db, item))
@@ -371,7 +350,7 @@ def _get_item(
 
 
 def _list_updates(db: Session, program: Program, entry_no: int, limit: int, page: int = 1) -> str:
-    item = _resolve(db, program, entry_no)
+    item = resolve_item(db, program, entry_no)
     everything = list_updates(db, item)
     if not everything:
         return f"#{item.entry_no} has no updates yet."
@@ -396,7 +375,7 @@ def _history_lines(db: Session, item) -> list[str]:
 
 
 def _history(db: Session, program: Program, entry_no: int) -> str:
-    item = _resolve(db, program, entry_no)
+    item = resolve_item(db, program, entry_no)
     if not item_history(db, item.id):
         return f"#{item.entry_no} has no recorded history."
     return "\n".join(
@@ -467,7 +446,7 @@ def _needs_attention(
 
 
 def _activity(db: Session, program: Program, raw: dict, limit: int, page: int = 1) -> str:
-    since_date = _as_date(raw["since"], "since")
+    since_date = parse_date(raw["since"], "since")
     entity_type = raw["entity_type"]
     if entity_type:
         entity_type = check_choice(entity_type, ENTITY_TYPES, "record type")

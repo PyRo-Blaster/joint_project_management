@@ -153,8 +153,12 @@ def test_0003_enforces_one_idempotency_key_per_programme(tmp_path):
     )
     with engine.begin() as conn:
         conn.execute(text(_user_row()))
-        conn.execute(text("INSERT INTO program (id, code, name, created_at) "
-                          "VALUES (1, 'GS098', 'P', '2026-09-24')"))
+        conn.execute(
+            text(
+                "INSERT INTO program (id, code, name, created_at) "
+                "VALUES (1, 'GS098', 'P', '2026-09-24')"
+            )
+        )
         conn.execute(text(item.format(n=1, key="NULL")))
         conn.execute(text(item.format(n=2, key="NULL")))
         conn.execute(text(item.format(n=3, key="'k-1'")))
