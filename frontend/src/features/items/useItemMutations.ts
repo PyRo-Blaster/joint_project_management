@@ -1,6 +1,6 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiFetch } from "@/lib/api/client";
-import type { ItemCreate, ItemOut, ItemPatch } from "@/lib/api/types";
+import type { AuditEventOut, ItemCreate, ItemOut, ItemPatch } from "@/lib/api/types";
 import { qk } from "@/lib/query";
 
 export function useCreateItem() {
@@ -51,6 +51,21 @@ export function useAcknowledgeItem(id: number) {
       qc.setQueryData(qk.items.detail(id), item);
       qc.invalidateQueries({ queryKey: qk.items.all() });
       qc.invalidateQueries({ queryKey: qk.items.history(id) });
+      qc.invalidateQueries({ queryKey: qk.dashboard.summary() });
+    },
+  });
+}
+
+/** Undo one recorded change. The server refuses, with the reason, when it cannot. */
+export function useRevertChange(itemId: number) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (eventId: number) =>
+      apiFetch<AuditEventOut>(`/activity/${eventId}/revert`, { method: "POST" }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: qk.items.detail(itemId) });
+      qc.invalidateQueries({ queryKey: qk.items.all() });
+      qc.invalidateQueries({ queryKey: qk.items.history(itemId) });
       qc.invalidateQueries({ queryKey: qk.dashboard.summary() });
     },
   });

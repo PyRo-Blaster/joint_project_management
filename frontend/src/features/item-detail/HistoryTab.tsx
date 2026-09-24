@@ -1,6 +1,8 @@
 import { History } from "lucide-react";
 import { AgentSource } from "@/components/domain/AgentBadges";
 import { DiffTable } from "@/components/domain/DiffTable";
+import { UndoButton } from "@/components/domain/UndoButton";
+import { Badge } from "@/components/ui/badge";
 import { RelativeTime } from "@/components/domain/RelativeTime";
 import { EmptyState } from "@/components/ui/empty-state";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -31,6 +33,8 @@ export function HistoryTab({ itemId }: { itemId: number }) {
               <span className="text-fg-muted">{e.summary}</span>
               <span className="text-fg-subtle">·</span>
               <RelativeTime iso={e.occurred_at} />
+              {e.reverted_by_event_id && <Badge variant="outline">Undone</Badge>}
+              {e.can_undo && <UndoButton itemId={itemId} eventId={e.id} />}
             </div>
             {Object.keys(changes).length > 0 && <DiffTable changes={changes} usersById={byId} />}
           </li>

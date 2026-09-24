@@ -89,6 +89,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activity/{event_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert
+         * @description Undo a field change. Refused, with the reason, when it was already undone, is
+         *     outside the undo window, or a field has changed again since.
+         */
+        post: operations["revert_api_activity__event_id__revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -530,6 +551,13 @@ export interface components {
             via: string;
             /** Token Name */
             token_name?: string | null;
+            /** Reverted By Event Id */
+            reverted_by_event_id?: number | null;
+            /**
+             * Can Undo
+             * @default false
+             */
+            can_undo: boolean;
         };
         /** Body_commit_api_import_excel_commit_post */
         Body_commit_api_import_excel_commit_post: {
@@ -583,6 +611,14 @@ export interface components {
             };
             /** Recent Activity */
             recent_activity: components["schemas"]["AuditEventOut"][];
+        };
+        /** Envelope[AuditEventOut] */
+        Envelope_AuditEventOut_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["AuditEventOut"] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
         };
         /** Envelope[DashboardSummary] */
         Envelope_DashboardSummary_: {
@@ -1450,6 +1486,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_list_AuditEventOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_api_activity__event_id__revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AuditEventOut_"];
                 };
             };
             /** @description Validation Error */

@@ -1,5 +1,6 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { ActivityFeed } from "./ActivityFeed";
+import { AgentReviewNotice } from "./AgentReviewNotice";
 import { Breakdowns } from "./Breakdowns";
 import { NeedsAttention } from "./NeedsAttention";
 import { StatTiles } from "./StatTiles";
@@ -23,6 +24,7 @@ export function DashboardPage() {
   return (
     <div className="flex flex-col gap-6">
       <h1 className="text-xl font-semibold">Dashboard</h1>
+      <AgentReviewNotice count={data.agent_unreviewed_count} />
       <StatTiles summary={data} />
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         <div className="flex flex-col gap-6">
