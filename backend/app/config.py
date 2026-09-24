@@ -31,6 +31,8 @@ class Settings(BaseSettings):
     mcp_writes_enabled: bool = True
     idempotency_ttl_hours: int = 24
     mcp_default_write_mode: Literal["append", "interactive"] = "interactive"
+    mcp_confirm_ttl_minutes: int = 10
+    agent_undo_days: int = 14
     due_soon_days: int = 14
     stale_days: int = 14
     login_attempts_per_minute: int = 5

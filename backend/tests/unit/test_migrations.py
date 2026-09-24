@@ -182,3 +182,32 @@ def test_0003_downgrade_clears_acknowledged_rows(tmp_path):
         actions = [row[0] for row in conn.execute(text("SELECT action FROM audit_event"))]
     assert actions == ["updated"]
     assert "idempotency_key" not in {c["name"] for c in inspect(engine).get_columns("action_item")}
+
+
+def test_0004_accepts_reverted_and_links_the_undone_event(tmp_path):
+    url = f"sqlite:///{tmp_path / 'm4.db'}"
+    command.upgrade(_config(url), "0004")
+    engine = create_engine(url)
+    assert "reverted_by_event_id" in {c["name"] for c in inspect(engine).get_columns("audit_event")}
+    with engine.begin() as conn:
+        conn.execute(text(_user_row()))
+        conn.execute(text(_action_row("updated")))
+        conn.execute(text(_action_row("reverted")))
+        conn.execute(text("UPDATE audit_event SET reverted_by_event_id = 2 WHERE id = 1"))
+
+
+def test_0004_downgrade_clears_reverted_rows(tmp_path):
+    url = f"sqlite:///{tmp_path / 'm4d.db'}"
+    cfg = _config(url)
+    command.upgrade(cfg, "0004")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        conn.execute(text(_user_row()))
+        conn.execute(text(_action_row("updated")))
+        conn.execute(text(_action_row("reverted")))
+    engine.dispose()
+    command.downgrade(cfg, "0003")
+    engine = create_engine(url)
+    with engine.begin() as conn:
+        actions = [row[0] for row in conn.execute(text("SELECT action FROM audit_event"))]
+    assert actions == ["updated"]
