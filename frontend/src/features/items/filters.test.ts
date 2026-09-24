@@ -27,3 +27,12 @@ test("counts only content filters", () => {
   expect(activeFilterCount(DEFAULT_FILTERS)).toBe(0);
   expect(activeFilterCount({ ...DEFAULT_FILTERS, status: ["open"], q: "x", page: 3 })).toBe(2);
 });
+
+test("the agent-review filter survives a round trip through the URL", () => {
+  const params = new URLSearchParams("needs_agent_review=true");
+  const filters = parseFilters(params);
+  expect(filters.needs_agent_review).toBe(true);
+  expect(filtersToSearchParams(filters).get("needs_agent_review")).toBe("true");
+  expect(activeFilterCount(filters)).toBe(1);
+  expect(parseFilters(new URLSearchParams()).needs_agent_review).toBe(false);
+});

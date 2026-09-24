@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen } from "@testing-library/react";
+import { ToastProvider } from "@/lib/toast";
 import { HistoryTab } from "./HistoryTab";
 
 function mockFetch(extra: Record<string, unknown> = {}) {
@@ -42,7 +43,9 @@ test("renders an audit event with a field diff using human labels", async () => 
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <HistoryTab itemId={3} />
+      <ToastProvider>
+        <HistoryTab itemId={3} />
+      </ToastProvider>
     </QueryClientProvider>,
   );
   expect(await screen.findByText(/changed status open → blocked/i)).toBeInTheDocument();
@@ -55,7 +58,9 @@ test("marks an agent's change with the token that made it", async () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <HistoryTab itemId={3} />
+      <ToastProvider>
+        <HistoryTab itemId={3} />
+      </ToastProvider>
     </QueryClientProvider>,
   );
   expect(await screen.findByText(/via agent · Claude Code/)).toBeInTheDocument();
@@ -66,9 +71,39 @@ test("does not mark a person's change", async () => {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   render(
     <QueryClientProvider client={qc}>
-      <HistoryTab itemId={3} />
+      <ToastProvider>
+        <HistoryTab itemId={3} />
+      </ToastProvider>
     </QueryClientProvider>,
   );
   expect(await screen.findByText(/changed status open → blocked/i)).toBeInTheDocument();
   expect(screen.queryByText(/via agent/)).not.toBeInTheDocument();
+});
+
+test("offers undo where the server allows it, and marks what was undone", async () => {
+  mockFetch({ can_undo: true });
+  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  const { unmount } = render(
+    <QueryClientProvider client={qc}>
+      <ToastProvider>
+        <HistoryTab itemId={3} />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByRole("button", { name: /undo/i })).toBeInTheDocument();
+  unmount();
+  vi.restoreAllMocks();
+
+  mockFetch({ can_undo: false, reverted_by_event_id: 12 });
+  render(
+    <QueryClientProvider
+      client={new QueryClient({ defaultOptions: { queries: { retry: false } } })}
+    >
+      <ToastProvider>
+        <HistoryTab itemId={3} />
+      </ToastProvider>
+    </QueryClientProvider>,
+  );
+  expect(await screen.findByText("Undone")).toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: /undo/i })).not.toBeInTheDocument();
 });
