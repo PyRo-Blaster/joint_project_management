@@ -122,6 +122,32 @@ def revoke_token(db: Session, *, actor: User, token: ApiToken) -> ApiToken:
     return token
 
 
+def why_refused(db: Session, raw: str) -> str:
+    """Explain a refused bearer value. Only its holder sees this, so naming the
+    token and its expiry leaks nothing they do not already have."""
+    candidate = (raw or "").strip()
+    token = (
+        db.scalar(select(ApiToken).where(ApiToken.token_hash == hash_token(candidate)))
+        if candidate.startswith(TOKEN_PREFIX)
+        else None
+    )
+    if token is None:
+        return "That API token is not recognised. Check it was copied whole, or create a new one."
+    if token.revoked_at is not None:
+        return (
+            f"API token '{token.name}' was revoked on {token.revoked_at.date().isoformat()}. "
+            "Create a new one under API tokens in the web app."
+        )
+    if token.expires_at is not None and token.expires_at <= utcnow():
+        return (
+            f"API token '{token.name}' expired on {token.expires_at.date().isoformat()}. "
+            "Create a new one under API tokens in the web app."
+        )
+    if not token.user.is_active:
+        return f"API token '{token.name}' belongs to a deactivated account and no longer works."
+    return "That API token cannot be used."
+
+
 def resolve_token(db: Session, raw: str) -> ApiToken | None:
     """Return the live token for a raw bearer value, sliding ``last_used_at`` forward."""
     candidate = (raw or "").strip()

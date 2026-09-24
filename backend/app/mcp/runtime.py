@@ -18,7 +18,7 @@ from app.models import ApiToken, Program, User
 from app.services.errors import DomainError, UnauthenticatedError
 from app.services.principal import Principal, set_principal
 from app.services.rate_limit import SlidingWindowLimiter
-from app.services.tokens import resolve_token
+from app.services.tokens import resolve_token, why_refused
 
 NO_TOKEN = (
     "This endpoint needs an API token. Send 'Authorization: Bearer cmct_...'; "
@@ -48,7 +48,7 @@ def resolve_caller(db: Session, headers: Mapping[str, str]) -> Caller:
         raise UnauthenticatedError(NO_TOKEN)
     token = resolve_token(db, raw)
     if token is None:
-        raise UnauthenticatedError("That API token is unknown, expired, or revoked.")
+        raise UnauthenticatedError(why_refused(db, raw))
     set_principal(db, Principal(via="mcp", token_name=token.name))
     return Caller(user=token.user, token=token)
 
