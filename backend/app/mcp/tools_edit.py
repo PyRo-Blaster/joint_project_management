@@ -263,8 +263,7 @@ def _stale(db: Session, items: list[ActionItem], issued_at) -> str | None:
             what = f" ({name} → {_show(change.get('new'))})"
         return (
             f"Item #{item.entry_no} changed at {event.occurred_at:%H:%M} UTC by "
-            f"{actor.name if actor else 'someone'}{what}. Nothing was applied. Re-read it with "
-            "cmc_get_item and retry."
+            f"{actor.name if actor else 'someone'}{what} after your preview. Nothing was applied."
         )
     return None
 
@@ -287,6 +286,15 @@ def _apply(db: Session, caller: Caller, planned: list[Planned]) -> None:
     db.commit()
 
 
+def _ask(caller: Caller, tool: str, request) -> str:
+    issued = issue(tool=tool, caller_token_id=caller.token.id, request=request)
+    return (
+        "Show this to the person you are working with. When they agree, call "
+        f'{tool} again with {CONFIRM_HELP}="{issued.token}" '
+        f"(valid until {issued.expires_at:%H:%M} UTC)."
+    )
+
+
 def _preview_or_apply(
     db: Session,
     caller: Caller,
@@ -302,17 +310,16 @@ def _preview_or_apply(
         return nothing
     body = _body(changing)
     if not confirm:
-        issued = issue(tool=tool, caller_token_id=caller.token.id, request=request)
-        return (
-            f"Preview — nothing has changed yet.\n{body}\n\n"
-            "Show this to the person you are working with. When they agree, call "
-            f'{tool} again with {CONFIRM_HELP}="{issued.token}" '
-            f"(valid until {issued.expires_at:%H:%M} UTC)."
-        )
+        return f"Preview — nothing has changed yet.\n{body}\n\n{_ask(caller, tool, request)}"
     issued_at = verify(confirm, tool=tool, caller_token_id=caller.token.id, request=request)
     stale = _stale(db, [entry.item for entry in changing], issued_at)
     if stale:
-        raise ToolError(stale)
+        # The plan was just made against the item as it is now, so hand back that
+        # diff with a fresh token (design 13) rather than making the agent start over.
+        raise ToolError(
+            f"{stale}\n\nThe same change against the item as it is now:\n{body}\n\n"
+            f"{_ask(caller, tool, request)} Check with cmc_get_item what else changed."
+        )
     _apply(db, caller, changing)
     days = get_settings().agent_undo_days
     return (

@@ -85,6 +85,7 @@ uv run python -m app.cli bootstrap
 uv run python -m app.cli create-admin someone@example.com --org yarrow
 uv run python -m app.cli import-excel path/to/sheet.xlsx --overrides '{"owner": {"formulation": "gensci"}}' --commit
 uv run python -m app.cli export-excel out.xlsx
+uv run python -m app.cli seed-eval      # fictional MCP evaluation data; empty programme only
 ```
 
 ## API notes
@@ -163,6 +164,7 @@ with `npx mcp-remote http://<host>:8000/mcp/ --header "Authorization: Bearer cmc
 | `cmc_set_status` | Change a status, with an optional note; preview then confirm |
 | `cmc_update_item` | Change live fields; preview then confirm |
 | `cmc_apply_batch` | Up to 50 changes and notes as one all-or-nothing transaction |
+| `cmc_export_workbook` | A 15-minute download link to the filtered item workbook, never the file |
 
 A token in **append** mode (for agents nobody is watching) can use the additive
 tools but none of the edit tools. Two prompts ship with the server:
@@ -171,6 +173,20 @@ tools but none of the edit tools. Two prompts ship with the server:
 The resource `cmc://program/briefing` carries the conventions both teams
 follow; an agent should read it once. Set `MCP_ENABLED=false` to stop serving
 the endpoint entirely.
+
+`cmc_export_workbook` returns a link, not bytes, so a workbook never fills the
+agent's context. The link is built from `APP_ORIGIN`, works without signing in
+for 15 minutes, and dies early if its token is revoked or its owner deactivated.
+Anyone holding it can download in that window, so an agent should hand it only
+to the person who asked. `kind="period_report"` is reserved for the V2.0
+monthly/quarterly report and refuses until that report exists.
+
+**Checking an agent end to end.** `scripts/mcp-smoke.sh` boots the app on a
+fresh database and drives `/mcp` over real HTTP (CI runs it, plus the official
+MCP Inspector). `docs/mcp/evaluation.xml` holds ten questions for evaluating a
+model against the server: load their data with `seed-eval` into an empty
+programme, then run them with an evaluation harness and an API key.
+`tests/eval` proves every answer is reachable through the tools.
 
 ## Frontend
 

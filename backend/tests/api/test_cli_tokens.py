@@ -74,3 +74,17 @@ def test_cli_writes_are_recorded_as_cli(cli_db, admin):
     event = cli_db.query(AuditEvent).filter(AuditEvent.entity_type == "api_token").one()
     assert event.via == "cli"
     assert event.token_name is None
+
+
+def test_create_defaults_to_the_configured_ttl(cli_db, admin, monkeypatch):
+    from datetime import timedelta
+
+    from app.config import get_settings
+    from app.models import ApiToken
+    from app.models.base import utcnow
+
+    monkeypatch.setattr(get_settings(), "mcp_token_ttl_days", 7)
+    result = runner.invoke(cli, ["token", "create", admin.email, "--name", "Short lived"])
+    assert result.exit_code == 0, result.output
+    token = cli_db.query(ApiToken).filter_by(name="Short lived").one()
+    assert token.expires_at - utcnow() < timedelta(days=8)

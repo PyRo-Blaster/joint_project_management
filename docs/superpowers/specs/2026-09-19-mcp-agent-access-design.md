@@ -1,7 +1,8 @@
 # Agent Access via MCP — Design
 
 Date: 2026-09-19
-Status: Draft for user review
+Status: Implemented (MCP phases 1–5, 2026-09-24). Where the build differs
+from this text, §14 says so and why; the text above it is the original design.
 Extends `2026-09-06-joint-cmc-tracker-design.md` (v1) and the three
 `2026-09-16-v2-*` documents. Target release: **V2.1**, with two small
 pieces pulled into V2.0 (§9).
@@ -26,7 +27,7 @@ service layer as the UI, and the audit row says *who* authorised it and
 | Transport | **Streamable HTTP mounted at `/mcp`** in the existing FastAPI container | No new image, no new port, no second thing to deploy. TLS, health check, and backups already cover it. Matches the project's "one image, one command" rule. |
 | stdio clients | Documented bridge (`mcp-remote`), **not** a second implementation | One code path. A stdio-only client on a laptop runs the bridge; everything else connects to the URL directly. |
 | Where tools call | **The service layer, in-process** | Services are the real contract: they own writes and record the audit event in the same transaction. Routers and MCP tools become two adapters over one core. No HTTP round-trip to ourselves. |
-| Language | Python, official `mcp` SDK (FastMCP), in `backend/app/mcp/` | Same container, same dependency tree, same tests. A Node process in this image would break the single-process model. |
+| Language | Python, official `mcp` SDK (`MCPServer`; the SDK renamed FastMCP in 2.x), in `backend/app/mcp/` | Same container, same dependency tree, same tests. A Node process in this image would break the single-process model. |
 | Auth | **Bearer API tokens** scoped to a user, new `api_token` table | Session cookies are for browsers. An agent needs a long-lived, revocable, scoped credential that is not a password. |
 | Identity | Every token belongs to a **real user**; the agent acts as that person | Keeps the permission model, the audit trail, and accountability unchanged. No "robot" accounts with ambiguous ownership. |
 | Write boundary | **Append applies, edits confirm in-conversation, delete does not exist** (§7) | Additive work runs unattended. An edit is previewed and confirmed in the same conversation, then stays undoable for 14 days. No approval queue, no second inbox. |
@@ -40,7 +41,7 @@ service layer as the UI, and the audit row says *who* authorised it and
                     ┌─────────────────────────────────────────┐
    Claude Code  ──► │  app container (unchanged image shape)  │
    claude.ai    ──► │                                         │
-   Claude Desktop   │   /mcp   ──►  app/mcp/  (FastMCP)       │
+   Claude Desktop   │   /mcp   ──►  app/mcp/  (MCPServer)     │
        │            │                   │                     │
        │ stdio      │   /api/* ──►  app/api/ (routers)        │
        └─ mcp-remote│                   │                     │
@@ -58,7 +59,7 @@ for their protocol. The invariant from the flow map holds unchanged —
 **nothing writes the database except a service, and every service write
 records its audit event in the same transaction.**
 
-Mounting: `create_app()` mounts the FastMCP ASGI app at `/mcp` when
+Mounting: `create_app()` mounts the `MCPServer` ASGI app at `/mcp` when
 `MCP_ENABLED` is true (default true). The SPA fallback already refuses to
 swallow non-SPA prefixes; `/mcp` joins `/api` in that list.
 
@@ -561,3 +562,35 @@ Beyond the project's existing layers:
   stops all writes while leaving reads working.
 - `docker compose up -d` from a V2.0 volume serves `/mcp` with no new
   container, no new port, and no new required environment variable.
+
+## 14. As built: where the implementation differs
+
+Every row was a deliberate decision, recorded in the phase dev log named in
+the last column (`docs/superpowers/logs/`). None weakens a guarantee in §7; the
+ones marked **open** are work this design depends on that does not exist yet.
+
+| Design | Built | Why | Log |
+|---|---|---|---|
+| §2, §3: FastMCP | `mcp.server.mcpserver.MCPServer` (SDK 2.2.0), stateless streamable HTTP, JSON responses, its lifespan run inside FastAPI's | The SDK renamed it; the old import no longer exists | MCP 2 |
+| §9: migration `0003` after V2.0's `0002` | `0002`–`0004` are the MCP migrations | V2.0 was not built first; its migrations will follow | MCP 1, 3, 4 |
+| §9: `via` includes `import` | `web`, `mcp`, `cli` | `via` is how a request arrived; an import is already `entity_type='import'` | MCP 1 |
+| §4.2: a `read_only` write mode | `scopes` = `read` or `read,write`; `write_mode` = `append` or `interactive` | `read_only` duplicated "no write scope" | MCP 1 |
+| §4.4: tokens managed on a profile page | A `/tokens` page; token management refuses bearer credentials | No profile page exists; a token must not mint its own successor | MCP 1 |
+| §4.3: `/mcp` resolution | Bearer tokens only, never the session cookie; the REST API is read-only to every token | Keeps all agent writes behind the §7 guardrails; also why the Host check is off by default | MCP 2, 3 |
+| §9: database-backed rate limiter | The in-memory sliding window, per process (600 reads, 60 writes a minute) | The image runs one worker. Moving to the database is due only if `--workers` is ever added | MCP 2 |
+| §7.7: unreviewed "until a person opens it" | Until a person clicks *Looks right* or edits it | A glance is not a review, and the undo bar must survive opening the item | MCP 3 |
+| §9: `agent_ack_*` columns plus "an agent touched it" | "Touched" is derived from `audit_event` | One source of truth per fact | MCP 3 |
+| §9: idempotency repeat within 24 h returns the original | Same; after the window it is refused, naming the original | The unique key cannot hold a second row | MCP 3 |
+| §7.3: token signs the item's `updated_at` | Signs the issue time; stale means a field-change event after it | `updated_at` also moves on a timeline note, which is not a conflict | MCP 4 |
+| §7.4: undo through `patch_item` | A `revert_event` service recording `reverted` | The spec asks for a distinct action; still a service write | MCP 4 |
+| §7.4: undo for agent changes | Undo for anyone's change, refused if a field moved on since | Undo is useful for human mistakes too; refusing protects later work | MCP 4 |
+| §7.4: a dashboard tile | A notice above the tiles when the count is above zero | A standing zero tile is noise | MCP 4 |
+| §7.2: identity fields are "not parameters" | Also refused by name: the SDK silently drops unknown arguments, so `StrictArguments` refuses any argument a tool does not take, with "did you mean" | Without it `cmc_update_item(title=...)` reported success and did nothing | MCP 4 |
+| §6.3: `from`, `to` | `from_date`, `to_date`; the item-kind filter is `item_kind` | `from` is a Python keyword and the SDK's aliases break at call time; `kind` already means the export kind | MCP 5 |
+| §6.3: `kind='period_report'` via the V2.0 report builders | **Open.** Refused with a message saying so | The V2.0 report builder does not exist | MCP 5 |
+| §5, §7.8: "the Audit log answers what the agents changed" | **Open.** `via` and `token_name` are stored, shown in history and the activity feed, and filterable in `cmc_list_activity` | The V2.0 Audit log page is not built | MCP 3 |
+| §11: protocol smoke against the container with the Inspector | The container smoke calls `tools/list` and `cmc_whoami`; a separate CI job runs the Inspector against the app on a migrated database | Same coverage; the Inspector needs Node, which the image deliberately lacks | MCP 5 |
+| §11: evaluation suite "run in CI" | CI proves every answer is reachable through the tools (`tests/eval`). **Running a model on the ten questions needs an API key** and is a manual step | CI has no model credentials | MCP 5 |
+| §8 stale-write copy: "Re-read it with cmc_get_item and retry" | Names who changed what, then returns the same change diffed against the item as it is now, with a fresh confirm token | §13 asks for the new diff; the agent should not have to start over | MCP 5 |
+| (not in design) | Tool results are text only (`structured_output=False`) | The SDK repeated every result as `structuredContent`, doubling each response | MCP 5 |
+

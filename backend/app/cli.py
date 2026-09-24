@@ -184,7 +184,9 @@ def token_create(
     write_mode: Annotated[
         str | None, typer.Option(help="append or interactive; default MCP_DEFAULT_WRITE_MODE")
     ] = None,
-    ttl_days: Annotated[int, typer.Option(help="0 means never expires")] = 90,
+    ttl_days: Annotated[
+        int | None, typer.Option(help="0 means never expires; default MCP_TOKEN_TTL_DAYS")
+    ] = None,
     actor: Annotated[str | None, typer.Option(help="Acting admin's email")] = None,
 ) -> None:
     """Create an API token and print it once."""
@@ -197,7 +199,7 @@ def token_create(
                 name=name,
                 scopes=[part.strip() for part in scopes.split(",") if part.strip()],
                 write_mode=write_mode or get_settings().mcp_default_write_mode,
-                ttl_days=ttl_days,
+                ttl_days=get_settings().mcp_token_ttl_days if ttl_days is None else ttl_days,
             )
         except DomainError as exc:
             raise typer.BadParameter(exc.message) from exc

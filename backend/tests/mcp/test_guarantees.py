@@ -78,3 +78,23 @@ def test_history_hides_internal_update_ids(mcp_writer, cli_db, program, admin, v
     history = mcp_writer.text("cmc_get_item_history", entry_no=item.entry_no)
     assert "posted an update" in history
     assert "update_id" not in history
+
+
+def test_a_read_token_is_refused_on_every_write_tool(mcp_client, cli_db, program, admin, vocab):
+    item = make_item(cli_db, program, admin)
+    arguments = {
+        "cmc_post_update": {"entry_no": item.entry_no, "body": "Hi"},
+        "cmc_create_item": {"title": "New", "group": "General Issues", "owner_org": "gensci"},
+        "cmc_set_status": {"entry_no": item.entry_no, "status": "blocked"},
+        "cmc_update_item": {"entry_no": item.entry_no, "priority": "p1"},
+        "cmc_apply_batch": {"changes": [{"entry_no": item.entry_no, "status": "on_hold"}]},
+    }
+    writers = [
+        tool["name"]
+        for tool in mcp_client.list_tools()
+        if not tool.get("annotations", {}).get("readOnlyHint")
+    ]
+    # A new write tool must be added here, so it cannot ship untested.
+    assert sorted(writers) == sorted(arguments)
+    for name in writers:
+        assert '"write"' in mcp_client.error(name, **arguments[name]), name
