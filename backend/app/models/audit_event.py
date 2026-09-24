@@ -27,3 +27,7 @@ class AuditEvent(Base):
     summary: Mapped[str] = mapped_column(String(500))
     via: Mapped[str] = mapped_column(String(8), default="web", server_default="web")
     token_name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    # Set on a change once it has been undone; points at the `reverted` event.
+    reverted_by_event_id: Mapped[int | None] = mapped_column(
+        ForeignKey("audit_event.id"), nullable=True
+    )
