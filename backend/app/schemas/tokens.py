@@ -9,7 +9,7 @@ from app.models import ApiToken
 class TokenCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     scopes: list[TokenScope] = ["read"]
-    write_mode: WriteMode = "interactive"
+    write_mode: WriteMode | None = None  # None takes MCP_DEFAULT_WRITE_MODE
     user_id: int | None = None
     ttl_days: int | None = None
 

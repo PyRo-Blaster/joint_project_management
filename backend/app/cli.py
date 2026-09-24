@@ -168,7 +168,9 @@ def token_create(
     email: Annotated[str, typer.Argument(help="Owner of the token")],
     name: Annotated[str, typer.Option(help="Label, e.g. 'Claude Code'")],
     scopes: Annotated[str, typer.Option(help="Comma separated: read, write")] = "read",
-    write_mode: Annotated[str, typer.Option(help="append or interactive")] = "interactive",
+    write_mode: Annotated[
+        str | None, typer.Option(help="append or interactive; default MCP_DEFAULT_WRITE_MODE")
+    ] = None,
     ttl_days: Annotated[int, typer.Option(help="0 means never expires")] = 90,
     actor: Annotated[str | None, typer.Option(help="Acting admin's email")] = None,
 ) -> None:
@@ -181,7 +183,7 @@ def token_create(
                 owner=_user_by_email(db, email),
                 name=name,
                 scopes=[part.strip() for part in scopes.split(",") if part.strip()],
-                write_mode=write_mode,
+                write_mode=write_mode or get_settings().mcp_default_write_mode,
                 ttl_days=ttl_days,
             )
         except DomainError as exc:

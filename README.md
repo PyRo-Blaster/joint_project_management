@@ -131,8 +131,11 @@ curl -H "Authorization: Bearer cmct_..." http://localhost:8000/api/items
 
 The container also serves a [Model Context Protocol](https://modelcontextprotocol.io)
 endpoint at `/mcp`, so an agent can read the tracker without driving a browser.
-It is **read-only in this release**: nothing it offers changes anything, and
-there is no tool for deleting in any release.
+Writing is **additive only** in this release: an agent can append a dated
+update and file a new item, and there is no tool for deleting in any release.
+A new item an agent files carries an **Unreviewed** chip until a person clicks
+*Looks right* on it or edits it, and every agent change is marked in History
+with the token that made it.
 
 Point a client that speaks streamable HTTP at `http://<host>:8000/mcp/` with
 the header `Authorization: Bearer cmct_...`. A stdio-only client can bridge
@@ -148,6 +151,8 @@ with `npx mcp-remote http://<host>:8000/mcp/ --header "Authorization: Bearer cmc
 | `cmc_get_item_history` | Who changed what on an item, old value to new |
 | `cmc_needs_attention` | Overdue, due soon, and stale items |
 | `cmc_list_activity` | Recent changes across the programme |
+| `cmc_post_update` | Append a dated progress note to an item (needs `write`) |
+| `cmc_create_item` | File a new item; refuses near-duplicate titles (needs `write`) |
 
 The resource `cmc://program/briefing` carries the conventions both teams
 follow; an agent should read it once. Set `MCP_ENABLED=false` to stop serving

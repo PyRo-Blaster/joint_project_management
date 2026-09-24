@@ -32,7 +32,7 @@ def create(payload: TokenCreate, user: SessionUser, db: DbDep, settings: Setting
         owner=owner,
         name=payload.name,
         scopes=payload.scopes,
-        write_mode=payload.write_mode,
+        write_mode=payload.write_mode or settings.mcp_default_write_mode,
         ttl_days=settings.mcp_token_ttl_days if payload.ttl_days is None else payload.ttl_days,
     )
     return ok(TokenCreated(token=raw, record=to_token_out(token, now=utcnow())))
