@@ -11,7 +11,7 @@ from app.constants import STATUS_LABELS
 from app.models import ActionItem, ItemUpdate, Program, User
 from app.models.base import utcnow
 from app.schemas.items import ItemBrief, ItemCreate, ItemOut, ItemPatch
-from app.services.agent_review import acknowledge_on_human_edit
+from app.services.agent_review import acknowledge_on_human_edit, pending_review_ids
 from app.services.audit import diff_changes, record_event
 from app.services.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.vocab import active_values
@@ -61,6 +61,7 @@ class ItemFilters:
     due_after: date | None = None
     q: str | None = None
     include_deleted: bool = False
+    needs_agent_review: bool = False
 
 
 def snapshot(item: ActionItem) -> dict:
@@ -88,6 +89,8 @@ def _apply_filters(stmt, filters: ItemFilters):
         stmt = stmt.where(ActionItem.due_on <= filters.due_before)
     if filters.due_after:
         stmt = stmt.where(ActionItem.due_on >= filters.due_after)
+    if filters.needs_agent_review:
+        stmt = stmt.where(ActionItem.id.in_(pending_review_ids()))
     if filters.q:
         pattern = f"%{filters.q.strip()}%"
         stmt = stmt.where(
@@ -388,8 +391,12 @@ def restore_item(db: Session, *, actor: User, item: ActionItem) -> ActionItem:
     return item
 
 
-def to_item_out(item: ActionItem, last_update_on: date | None = None) -> ItemOut:
-    return ItemOut.model_validate(item).model_copy(update={"last_update_on": last_update_on})
+def to_item_out(
+    item: ActionItem, last_update_on: date | None = None, needs_agent_review: bool = False
+) -> ItemOut:
+    return ItemOut.model_validate(item).model_copy(
+        update={"last_update_on": last_update_on, "needs_agent_review": needs_agent_review}
+    )
 
 
 def to_item_brief(item: ActionItem, last_update_on: date | None = None) -> ItemBrief:

@@ -18,6 +18,8 @@ class AuditEventOut(BaseModel):
     occurred_at: datetime
     changes: dict[str, Any]
     summary: str
+    via: str = "web"
+    token_name: str | None = None
 
 
 def to_audit_out(event: AuditEvent, actor: User) -> AuditEventOut:
@@ -33,4 +35,6 @@ def to_audit_out(event: AuditEvent, actor: User) -> AuditEventOut:
         occurred_at=event.occurred_at,
         changes=event.changes,
         summary=event.summary,
+        via=event.via,
+        token_name=event.token_name,
     )

@@ -8,6 +8,7 @@ class NeedsAttention(BaseModel):
     overdue: list[ItemBrief]
     due_soon: list[ItemBrief]
     stale: list[ItemBrief]
+    agent_unreviewed: list[ItemBrief] = []
 
 
 class DashboardSummary(BaseModel):
@@ -17,6 +18,7 @@ class DashboardSummary(BaseModel):
     overdue_count: int
     due_soon_count: int
     stale_count: int
+    agent_unreviewed_count: int = 0
     needs_attention: NeedsAttention
     by_group: dict[str, int]
     by_owner_org: dict[str, int]
