@@ -42,8 +42,9 @@ def update_line(update: ItemUpdate, author: User | None = None) -> str:
 
 def event_line(event: AuditEvent, actor: User) -> str:
     source = " [agent]" if event.via == "mcp" else ""
+    undone = " (undone)" if event.reverted_by_event_id else ""
     when = event.occurred_at.strftime("%Y-%m-%d %H:%M")
-    return f"{when}{source} {actor.name}: {event.summary}"
+    return f"{when}{source} {actor.name}: {event.summary}{undone}"
 
 
 def changes_lines(event: AuditEvent) -> list[str]:

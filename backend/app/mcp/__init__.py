@@ -19,23 +19,31 @@ Call cmc_list_vocabulary before filtering on or quoting a group or category:
 the valid values are programme-specific. Read cmc://program/briefing once for
 the conventions both teams follow.
 
-Writing is additive only in this release: cmc_post_update appends a dated note and
-cmc_create_item files a new item, which stays flagged until a person reviews it.
-There is no tool that deletes anything, and there never will be.\
+Writing comes in two kinds. Additive tools apply at once: cmc_post_update appends
+a dated note and cmc_create_item files a new item, flagged until a person reviews
+it. Edit tools (cmc_set_status, cmc_update_item, cmc_apply_batch) take two calls:
+the first changes nothing and returns a diff and a confirm token; show the person
+the diff, and only when they agree, call again with the token. Title, group,
+owner and kind cannot be edited here. No tool deletes anything, and none ever will.\
 """
 
 
 def build_mcp_server() -> MCPServer:
-    from app.mcp import prompts, tools_read, tools_write
+    from app.mcp import prompts, tools_edit, tools_read, tools_write
+    from app.mcp.strict_args import StrictArguments
 
+    strict = StrictArguments()
     server = MCPServer(
         name="joint-cmc-tracker",
         title="Joint CMC Tracker",
         version=__version__,
         instructions=INSTRUCTIONS,
+        middleware=[strict],
     )
+    strict.server = server
     tools_read.register(server)
     tools_write.register(server)
+    tools_edit.register(server)
     prompts.register(server)
     return server
 

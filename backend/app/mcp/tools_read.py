@@ -244,7 +244,10 @@ def _whoami(db: Session, caller: Caller, program: Program) -> str:
     elif caller.token.write_mode == "append":
         ability = "It can post updates and file items, but never edit one (append mode)."
     else:
-        ability = "It can post updates and file items. Nothing can delete."
+        ability = (
+            "It can post updates and file items, and edit live fields once the person "
+            "confirms a preview. Nothing can delete."
+        )
     return "\n".join(
         [
             f"Acting as {caller.user.name} <{caller.user.email}>",
