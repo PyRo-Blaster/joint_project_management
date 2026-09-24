@@ -313,8 +313,16 @@ def _status_summary(item: ActionItem, changes: dict) -> str:
 
 
 def patch_item(
-    db: Session, *, actor: User, item: ActionItem, patch: ItemPatch, today: date | None = None
+    db: Session,
+    *,
+    actor: User,
+    item: ActionItem,
+    patch: ItemPatch,
+    today: date | None = None,
+    commit: bool = True,
 ) -> ActionItem:
+    """Apply a partial update. With ``commit=False`` the caller commits, so several
+    writes can land together or not at all."""
     today = today or date.today()
     if item.deleted_at is not None:
         raise ConflictError("Item is deleted; restore it first")
@@ -348,8 +356,11 @@ def patch_item(
         changes=changes,
         program_id=item.program_id,
     )
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
+    else:
+        db.flush()
     return item
 
 

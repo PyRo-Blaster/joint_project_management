@@ -48,6 +48,7 @@ def create_update(
     body: str,
     occurred_on: date | None = None,
     today: date | None = None,
+    commit: bool = True,
 ) -> ItemUpdate:
     if item.deleted_at is not None:
         raise ConflictError("Item is deleted; restore it first")
@@ -73,8 +74,11 @@ def create_update(
         changes={"update_id": {"old": None, "new": update.id}},
         program_id=item.program_id,
     )
-    db.commit()
-    db.refresh(update)
+    if commit:
+        db.commit()
+        db.refresh(update)
+    else:
+        db.flush()
     return update
 
 
