@@ -3,7 +3,8 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { AuditEventOut, ItemOut } from "@/lib/api/types";
 import { ToastProvider } from "@/lib/toast";
-import { AgentReviewBar, pendingAgentWork } from "./AgentReviewBar";
+import { AgentReviewBar } from "./AgentReviewBar";
+import { pendingAgentWork } from "./agent-work";
 
 const ITEM = {
   id: 7,
