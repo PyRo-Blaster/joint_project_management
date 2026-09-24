@@ -30,6 +30,8 @@ function makeItem(overrides: Partial<ItemOut>): ItemOut {
     updated_at: "2026-02-06T00:00:00",
     deleted_at: null,
     last_update_on: null,
+    needs_agent_review: false,
+    agent_ack_at: null,
     ...overrides,
   };
 }
@@ -76,4 +78,23 @@ test("clicking a sortable header requests that sort key", async () => {
   );
   await userEvent.click(screen.getByRole("button", { name: /title/i }));
   expect(onSort).toHaveBeenCalledWith("title");
+});
+
+test("flags an item an agent filed that no one has confirmed", () => {
+  render(
+    <ItemsTable
+      items={[
+        makeItem({ id: 2, entry_no: 2, needs_agent_review: true }),
+        makeItem({ id: 3, entry_no: 3 }),
+      ]}
+      usersById={new Map()}
+      visible={new Set(DEFAULT_VISIBLE)}
+      sort="entry_no"
+      direction="asc"
+      onSort={noop}
+      onOpen={noop}
+      selectedId={null}
+    />,
+  );
+  expect(screen.getAllByText("Unreviewed")).toHaveLength(1);
 });

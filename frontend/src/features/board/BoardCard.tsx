@@ -1,5 +1,6 @@
 import { useDraggable } from "@dnd-kit/core";
 import { useNavigate } from "react-router-dom";
+import { UnreviewedBadge } from "@/components/domain/AgentBadges";
 import { DueDate } from "@/components/domain/DueDate";
 import { OwnerBadge } from "@/components/domain/OwnerBadge";
 import { PriorityBadge } from "@/components/domain/PriorityBadge";
@@ -25,6 +26,11 @@ export function BoardCard({ item }: { item: ItemOut }) {
         <PriorityBadge priority={item.priority} />
       </div>
       <p className="mt-1 line-clamp-2 text-sm font-medium">{item.title}</p>
+      {item.needs_agent_review && (
+        <div className="mt-1.5">
+          <UnreviewedBadge />
+        </div>
+      )}
       <div className="mt-2 flex items-center justify-between gap-2 text-xs">
         <OwnerBadge owner={item.owner_org} />
         <DueDate dueOn={item.due_on} />

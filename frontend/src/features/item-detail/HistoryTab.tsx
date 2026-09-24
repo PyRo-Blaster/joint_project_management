@@ -1,4 +1,5 @@
 import { History } from "lucide-react";
+import { AgentSource } from "@/components/domain/AgentBadges";
 import { DiffTable } from "@/components/domain/DiffTable";
 import { RelativeTime } from "@/components/domain/RelativeTime";
 import { EmptyState } from "@/components/ui/empty-state";
@@ -26,6 +27,7 @@ export function HistoryTab({ itemId }: { itemId: number }) {
             <span className="absolute -left-1 top-1.5 size-2 rounded-full bg-accent" aria-hidden />
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-medium">{e.actor_name}</span>
+              <AgentSource via={e.via} tokenName={e.token_name} />
               <span className="text-fg-muted">{e.summary}</span>
               <span className="text-fg-subtle">·</span>
               <RelativeTime iso={e.occurred_at} />

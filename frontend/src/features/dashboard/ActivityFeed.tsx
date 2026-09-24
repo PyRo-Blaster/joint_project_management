@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AgentSource } from "@/components/domain/AgentBadges";
 import { RelativeTime } from "@/components/domain/RelativeTime";
 import { ORG_LABELS } from "@/lib/labels";
 import type { Org } from "@/lib/constants";
@@ -54,6 +55,7 @@ export function ActivityFeed() {
                 />
                 <span className="min-w-0">
                   <span className="font-medium">{e.actor_name}</span>{" "}
+                  <AgentSource via={e.via} tokenName={e.token_name} />{" "}
                   <span className="text-fg-muted">{e.summary}</span>{" "}
                   <RelativeTime iso={e.occurred_at} />
                 </span>
