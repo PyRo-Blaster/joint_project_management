@@ -20,9 +20,13 @@ class AuditEventOut(BaseModel):
     summary: str
     via: str = "web"
     token_name: str | None = None
+    reverted_by_event_id: int | None = None
+    can_undo: bool = False
 
 
 def to_audit_out(event: AuditEvent, actor: User) -> AuditEventOut:
+    from app.services.revert import revertible
+
     return AuditEventOut(
         id=event.id,
         program_id=event.program_id,
@@ -37,4 +41,6 @@ def to_audit_out(event: AuditEvent, actor: User) -> AuditEventOut:
         summary=event.summary,
         via=event.via,
         token_name=event.token_name,
+        reverted_by_event_id=event.reverted_by_event_id,
+        can_undo=revertible(event) is None,
     )
