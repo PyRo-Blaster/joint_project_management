@@ -8,6 +8,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.models import AuditEvent, User
+from app.services.principal import current_principal
 
 ActivityRow = tuple[AuditEvent, User]
 
@@ -40,6 +41,7 @@ def record_event(
     program_id: int | None = None,
 ) -> AuditEvent:
     """Add an audit row to the session. The caller commits, so the event shares the transaction."""
+    principal = current_principal(db)
     event = AuditEvent(
         program_id=program_id,
         entity_type=entity_type,
@@ -48,6 +50,8 @@ def record_event(
         actor_id=actor.id,
         changes=dict(changes or {}),
         summary=summary[:500],
+        via=principal.via,
+        token_name=principal.token_name,
     )
     db.add(event)
     return event
@@ -61,6 +65,7 @@ def list_activity(
     actor_id: int | None = None,
     entity_type: str | None = None,
     since: datetime | None = None,
+    via: str | None = None,
     page: int = 1,
     limit: int = 20,
 ) -> tuple[list[ActivityRow], int]:
@@ -75,6 +80,8 @@ def list_activity(
         stmt = stmt.where(AuditEvent.entity_type == entity_type)
     if since:
         stmt = stmt.where(AuditEvent.occurred_at >= since)
+    if via:
+        stmt = stmt.where(AuditEvent.via == via)
     total = db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
     ordered = stmt.order_by(AuditEvent.occurred_at.desc(), AuditEvent.id.desc())
     rows = db.execute(ordered.offset((page - 1) * limit).limit(limit)).all()

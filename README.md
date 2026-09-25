@@ -85,14 +85,113 @@ uv run python -m app.cli bootstrap
 uv run python -m app.cli create-admin someone@example.com --org yarrow
 uv run python -m app.cli import-excel path/to/sheet.xlsx --overrides '{"owner": {"formulation": "gensci"}}' --commit
 uv run python -m app.cli export-excel out.xlsx
+uv run python -m app.cli seed-eval      # fictional MCP evaluation data; empty programme only
+uv run python -m app.cli export-contracts  # regenerate the OpenAPI + MCP contracts in docs/
 ```
 
 ## API notes
 
 - Every JSON response is `{success, data, error, meta}`.
 - Mutating requests must send `X-Requested-With: fetch`.
-- Authentication is a session cookie set by `POST /api/auth/login`.
+- Authentication is a session cookie set by `POST /api/auth/login`, or an API
+  token sent as `Authorization: Bearer cmct_...`.
 - OpenAPI: `/api/docs`.
+
+### API tokens
+
+An API token lets a script or an agent use the API without a browser. It belongs
+to a real user and acts as that person, so the permission model and the audit
+trail are unchanged; every change it makes is recorded with its source and the
+token's name, which the activity feed and item history show.
+
+- **Scopes.** A token is `read`, or `read,write`. There is no admin scope.
+- **The REST API is read-only to every token.** A token on any `POST`, `PATCH`,
+  or `DELETE` under `/api` gets 403. Agents write only through the MCP endpoint
+  at `/mcp`, where the guardrails live: no delete, no identity fields, and
+  confirm-before-edit. The `write` scope governs what a token may do there.
+- **Managing tokens** needs a browser session, at **API tokens** in the sidebar.
+  A token can never create or revoke another, so it cannot escalate itself.
+  Members manage their own; admins see everyone's.
+- **The raw value is shown once** at creation and only its first 12 characters
+  are stored in a readable form. Lost tokens are revoked and replaced, not
+  recovered.
+- **Revoking is immediate.** Deactivating a user disables their tokens too.
+
+```bash
+uv run python -m app.cli token create someone@example.com --name "Claude Code" --scopes read,write
+uv run python -m app.cli token list
+uv run python -m app.cli token revoke cmct_abc1234
+```
+
+Try one:
+
+```bash
+curl -H "Authorization: Bearer cmct_..." http://localhost:8000/api/items
+```
+
+### Agent access (MCP)
+
+> **Integrating another system or agent?** Start with
+> [`docs/superpowers/architecture/`](docs/superpowers/architecture/2026-09-25-architecture-and-schema-as-built.md):
+> architecture, schema, permissions, and the generated OpenAPI and MCP contracts.
+
+The container also serves a [Model Context Protocol](https://modelcontextprotocol.io)
+endpoint at `/mcp`, so an agent can read the tracker without driving a browser.
+**Additive writes apply at once**: an agent can append a dated update and file
+a new item. **Edits take two calls**: the first changes nothing and returns the
+exact diff with a confirm token; the agent shows the person, and only when they
+agree calls again with the token. An agent can change an item's live state
+(status, dates, priority, category, assignee, details, notes, file path) but
+never its identity (title, group, owner, kind). No tool deletes, in any release.
+
+Anything an agent filed or changed carries an **Unreviewed** chip until a person
+clicks *Looks right* or edits the item, and the dashboard says when something is
+waiting. Every change, a person's or an agent's, can be **undone** from the item's
+History for 14 days, unless a field has changed again since; the change and its
+undoing both stay in the trail.
+
+Point a client that speaks streamable HTTP at `http://<host>:8000/mcp/` with
+the header `Authorization: Bearer cmct_...`. A stdio-only client can bridge
+with `npx mcp-remote http://<host>:8000/mcp/ --header "Authorization: Bearer cmct_..."`.
+
+| Tool | What it answers |
+|---|---|
+| `cmc_whoami` | Who this token acts as, and what it may do |
+| `cmc_list_vocabulary` | Every valid group, category, status, priority, org, and person |
+| `cmc_search_items` | Find items, one compact line each |
+| `cmc_get_item` | The full record of one item, with recent updates |
+| `cmc_list_updates` | One item's dated timeline |
+| `cmc_get_item_history` | Who changed what on an item, old value to new |
+| `cmc_needs_attention` | Overdue, due soon, and stale items |
+| `cmc_list_activity` | Recent changes across the programme |
+| `cmc_post_update` | Append a dated progress note to an item (needs `write`) |
+| `cmc_create_item` | File a new item; refuses near-duplicate titles (needs `write`) |
+| `cmc_set_status` | Change a status, with an optional note; preview then confirm |
+| `cmc_update_item` | Change live fields; preview then confirm |
+| `cmc_apply_batch` | Up to 50 changes and notes as one all-or-nothing transaction |
+| `cmc_export_workbook` | A 15-minute download link to the filtered item workbook, never the file |
+
+A token in **append** mode (for agents nobody is watching) can use the additive
+tools but none of the edit tools. Two prompts ship with the server:
+`weekly_update` and `meeting_minutes_to_changes`.
+
+The resource `cmc://program/briefing` carries the conventions both teams
+follow; an agent should read it once. Set `MCP_ENABLED=false` to stop serving
+the endpoint entirely.
+
+`cmc_export_workbook` returns a link, not bytes, so a workbook never fills the
+agent's context. The link is built from `APP_ORIGIN`, works without signing in
+for 15 minutes, and dies early if its token is revoked or its owner deactivated.
+Anyone holding it can download in that window, so an agent should hand it only
+to the person who asked. `kind="period_report"` is reserved for the V2.0
+monthly/quarterly report and refuses until that report exists.
+
+**Checking an agent end to end.** `scripts/mcp-smoke.sh` boots the app on a
+fresh database and drives `/mcp` over real HTTP (CI runs it, plus the official
+MCP Inspector). `docs/mcp/evaluation.xml` holds ten questions for evaluating a
+model against the server: load their data with `seed-eval` into an empty
+programme, then run them with an evaluation harness and an API key.
+`tests/eval` proves every answer is reachable through the tools.
 
 ## Frontend
 

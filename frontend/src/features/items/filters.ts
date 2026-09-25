@@ -11,6 +11,7 @@ export interface ItemFilters {
   due_before: string | null;
   due_after: string | null;
   q: string | null;
+  needs_agent_review: boolean;
   sort: string;
   direction: "asc" | "desc";
   page: number;
@@ -28,6 +29,7 @@ export const DEFAULT_FILTERS: ItemFilters = {
   due_before: null,
   due_after: null,
   q: null,
+  needs_agent_review: false,
   sort: "entry_no",
   direction: "asc",
   page: 1,
@@ -50,6 +52,7 @@ export function parseFilters(params: URLSearchParams): ItemFilters {
     due_before: params.get("due_before"),
     due_after: params.get("due_after"),
     q: params.get("q"),
+    needs_agent_review: params.get("needs_agent_review") === "true",
     sort: params.get("sort") || DEFAULT_FILTERS.sort,
     direction: params.get("direction") === "desc" ? "desc" : "asc",
     page: params.get("page") ? Math.max(1, Number(params.get("page"))) : 1,
@@ -68,6 +71,7 @@ export function filtersToSearchParams(filters: ItemFilters): URLSearchParams {
   if (filters.due_before) params.set("due_before", filters.due_before);
   if (filters.due_after) params.set("due_after", filters.due_after);
   if (filters.q) params.set("q", filters.q);
+  if (filters.needs_agent_review) params.set("needs_agent_review", "true");
   if (filters.sort !== DEFAULT_FILTERS.sort) params.set("sort", filters.sort);
   if (filters.direction !== DEFAULT_FILTERS.direction) params.set("direction", filters.direction);
   if (filters.page !== 1) params.set("page", String(filters.page));
@@ -88,6 +92,7 @@ export function filtersToApiParams(filters: ItemFilters): Record<string, unknown
     due_before: filters.due_before,
     due_after: filters.due_after,
     q: filters.q,
+    needs_agent_review: filters.needs_agent_review || undefined,
     sort: filters.sort,
     direction: filters.direction,
     page: filters.page,
@@ -104,5 +109,6 @@ export function activeFilterCount(filters: ItemFilters): number {
   if (filters.due_before) n++;
   if (filters.due_after) n++;
   if (filters.q) n++;
+  if (filters.needs_agent_review) n++;
   return n;
 }

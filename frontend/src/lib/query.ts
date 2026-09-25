@@ -28,6 +28,10 @@ export const qk = {
   vocab: { list: () => ["vocab"] as const },
   users: { list: () => ["users"] as const, admin: () => ["users", "admin"] as const },
   invitations: { list: () => ["invitations"] as const },
+  tokens: {
+    all: () => ["tokens"] as const,
+    list: (all: boolean) => ["tokens", { all }] as const,
+  },
   dashboard: { summary: () => ["dashboard", "summary"] as const },
   activity: { list: (filters: unknown) => ["activity", filters] as const },
 };

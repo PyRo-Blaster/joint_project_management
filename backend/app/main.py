@@ -2,6 +2,7 @@
 
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
@@ -14,6 +15,7 @@ from app import __version__
 from app.api.router import api_router
 from app.config import get_settings
 from app.constants import CSRF_HEADER, CSRF_VALUE, REQUEST_ID_HEADER
+from app.mcp import mcp_asgi_app
 from app.schemas.common import fail
 from app.services.errors import DomainError
 
@@ -37,11 +39,11 @@ def _validation_fields(exc: RequestValidationError) -> dict[str, str]:
 class SPAStaticFiles(StaticFiles):
     """Serve the built SPA, falling back to index.html for client-side routes.
 
-    Unknown ``/api/*`` paths keep the JSON envelope 404 instead of the SPA shell.
+    Unknown ``/api/*`` and ``/mcp/*`` paths keep a real 404 instead of the SPA shell.
     """
 
     async def get_response(self, path: str, scope):
-        if path == "api" or path.startswith("api/"):
+        if path in {"api", "mcp"} or path.startswith(("api/", "mcp/")):
             raise StarletteHTTPException(status_code=404, detail="Not Found")
         try:
             return await super().get_response(path, scope)
@@ -54,14 +56,29 @@ class SPAStaticFiles(StaticFiles):
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
+    mcp_app = mcp_asgi_app(settings) if settings.mcp_enabled else None
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        # The MCP session manager starts its task group inside its own lifespan.
+        # Mounting alone is not enough: the first request fails without this.
+        if mcp_app is None:
+            yield
+            return
+        async with mcp_app.router.lifespan_context(mcp_app):
+            yield
+
     app = FastAPI(
         title="Joint CMC Tracker",
         version=__version__,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         redoc_url=None,
+        lifespan=lifespan,
     )
     app.include_router(api_router, prefix="/api")
+    if mcp_app is not None:
+        app.mount("/mcp", mcp_app)
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):

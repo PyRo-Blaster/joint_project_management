@@ -89,6 +89,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/activity/{event_id}/revert": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Revert
+         * @description Undo a field change. Refused, with the reason, when it was already undone, is
+         *     outside the undo window, or a field has changed again since.
+         */
+        post: operations["revert_api_activity__event_id__revert_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/users": {
         parameters: {
             query?: never;
@@ -152,6 +173,44 @@ export interface paths {
         /** Reset Link */
         post: operations["reset_link_api_users__user_id__reset_link_post"];
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tokens": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List All
+         * @description Own tokens by default; every user's when an admin passes ``all``.
+         */
+        get: operations["list_all_api_tokens_get"];
+        put?: never;
+        /** Create */
+        post: operations["create_api_tokens_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/tokens/{token_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** Revoke */
+        delete: operations["revoke_api_tokens__token_id__delete"];
         options?: never;
         head?: never;
         patch?: never;
@@ -315,6 +374,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/items/{item_id}/ack": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Acknowledge Agent Changes
+         * @description A person confirms an agent's work on this item. Tokens are refused: an agent
+         *     marking its own work reviewed would defeat the point.
+         */
+        post: operations["acknowledge_agent_changes_api_items__item_id__ack_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/items/{item_id}/updates": {
         parameters: {
             query?: never;
@@ -464,6 +544,20 @@ export interface components {
             };
             /** Summary */
             summary: string;
+            /**
+             * Via
+             * @default web
+             */
+            via: string;
+            /** Token Name */
+            token_name?: string | null;
+            /** Reverted By Event Id */
+            reverted_by_event_id?: number | null;
+            /**
+             * Can Undo
+             * @default false
+             */
+            can_undo: boolean;
         };
         /** Body_commit_api_import_excel_commit_post */
         Body_commit_api_import_excel_commit_post: {
@@ -501,6 +595,11 @@ export interface components {
             due_soon_count: number;
             /** Stale Count */
             stale_count: number;
+            /**
+             * Agent Unreviewed Count
+             * @default 0
+             */
+            agent_unreviewed_count: number;
             needs_attention: components["schemas"]["NeedsAttention"];
             /** By Group */
             by_group: {
@@ -512,6 +611,14 @@ export interface components {
             };
             /** Recent Activity */
             recent_activity: components["schemas"]["AuditEventOut"][];
+        };
+        /** Envelope[AuditEventOut] */
+        Envelope_AuditEventOut_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["AuditEventOut"] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
         };
         /** Envelope[DashboardSummary] */
         Envelope_DashboardSummary_: {
@@ -586,6 +693,22 @@ export interface components {
             error?: components["schemas"]["ErrorBody"] | null;
             meta?: components["schemas"]["Meta"] | null;
         };
+        /** Envelope[TokenCreated] */
+        Envelope_TokenCreated_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["TokenCreated"] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
+        };
+        /** Envelope[TokenOut] */
+        Envelope_TokenOut_: {
+            /** Success */
+            success: boolean;
+            data?: components["schemas"]["TokenOut"] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
+        };
         /** Envelope[UpdateOut] */
         Envelope_UpdateOut_: {
             /** Success */
@@ -634,6 +757,15 @@ export interface components {
             success: boolean;
             /** Data */
             data?: components["schemas"]["ItemOut"][] | null;
+            error?: components["schemas"]["ErrorBody"] | null;
+            meta?: components["schemas"]["Meta"] | null;
+        };
+        /** Envelope[list[TokenOut]] */
+        Envelope_list_TokenOut__: {
+            /** Success */
+            success: boolean;
+            /** Data */
+            data?: components["schemas"]["TokenOut"][] | null;
             error?: components["schemas"]["ErrorBody"] | null;
             meta?: components["schemas"]["Meta"] | null;
         };
@@ -921,6 +1053,13 @@ export interface components {
             deleted_at: string | null;
             /** Last Update On */
             last_update_on?: string | null;
+            /** Agent Ack At */
+            agent_ack_at?: string | null;
+            /**
+             * Needs Agent Review
+             * @default false
+             */
+            needs_agent_review: boolean;
         };
         /** ItemPatch */
         ItemPatch: {
@@ -980,6 +1119,11 @@ export interface components {
             due_soon: components["schemas"]["ItemBrief"][];
             /** Stale */
             stale: components["schemas"]["ItemBrief"][];
+            /**
+             * Agent Unreviewed
+             * @default []
+             */
+            agent_unreviewed: components["schemas"]["ItemBrief"][];
         };
         /** PreviewRowOut */
         PreviewRowOut: {
@@ -1022,6 +1166,63 @@ export interface components {
              * Format: date-time
              */
             expires_at: string;
+        };
+        /** TokenCreate */
+        TokenCreate: {
+            /** Name */
+            name: string;
+            /**
+             * Scopes
+             * @default [
+             *       "read"
+             *     ]
+             */
+            scopes: ("read" | "write")[];
+            /** Write Mode */
+            write_mode?: ("append" | "interactive") | null;
+            /** User Id */
+            user_id?: number | null;
+            /** Ttl Days */
+            ttl_days?: number | null;
+        };
+        /**
+         * TokenCreated
+         * @description The only response that ever carries the raw token value.
+         */
+        TokenCreated: {
+            /** Token */
+            token: string;
+            record: components["schemas"]["TokenOut"];
+        };
+        /** TokenOut */
+        TokenOut: {
+            /** Id */
+            id: number;
+            /** User Id */
+            user_id: number;
+            /** User Name */
+            user_name: string;
+            /** Name */
+            name: string;
+            /** Prefix */
+            prefix: string;
+            /** Scopes */
+            scopes: string[];
+            /** Write Mode */
+            write_mode: string;
+            /**
+             * Created At
+             * Format: date-time
+             */
+            created_at: string;
+            /** Expires At */
+            expires_at: string | null;
+            /** Last Used At */
+            last_used_at: string | null;
+            /** Revoked At */
+            revoked_at: string | null;
+            /** Is Active */
+            is_active: boolean;
         };
         /** UpdateCreate */
         UpdateCreate: {
@@ -1267,7 +1468,7 @@ export interface operations {
             query?: {
                 org?: ("gensci" | "yarrow") | null;
                 actor_id?: number | null;
-                entity_type?: ("item" | "user" | "invitation" | "vocab_term" | "import") | null;
+                entity_type?: ("item" | "user" | "invitation" | "vocab_term" | "import" | "api_token") | null;
                 since?: string | null;
                 page?: number;
                 limit?: number;
@@ -1285,6 +1486,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_list_AuditEventOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revert_api_activity__event_id__revert_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                event_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_AuditEventOut_"];
                 };
             };
             /** @description Validation Error */
@@ -1391,6 +1623,101 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_ResetLinkOut_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    list_all_api_tokens_get: {
+        parameters: {
+            query?: {
+                all?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_list_TokenOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    create_api_tokens_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TokenCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_TokenCreated_"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    revoke_api_tokens__token_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                token_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_TokenOut_"];
                 };
             };
             /** @description Validation Error */
@@ -1637,6 +1964,7 @@ export interface operations {
                 due_before?: string | null;
                 due_after?: string | null;
                 q?: string | null;
+                needs_agent_review?: boolean;
             };
             header?: never;
             path?: never;
@@ -1843,6 +2171,37 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Envelope_list_AuditEventOut__"];
+                };
+            };
+            /** @description Validation Error */
+            422: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HTTPValidationError"];
+                };
+            };
+        };
+    };
+    acknowledge_agent_changes_api_items__item_id__ack_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                item_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Envelope_ItemOut_"];
                 };
             };
             /** @description Validation Error */
@@ -2089,6 +2448,7 @@ export interface operations {
                 due_before?: string | null;
                 due_after?: string | null;
                 q?: string | null;
+                needs_agent_review?: boolean;
             };
             header?: never;
             path?: never;

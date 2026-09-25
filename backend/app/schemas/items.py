@@ -66,6 +66,8 @@ class ItemOut(BaseModel):
     updated_at: datetime
     deleted_at: datetime | None
     last_update_on: date | None = None
+    agent_ack_at: datetime | None = None
+    needs_agent_review: bool = False
 
 
 class ItemBrief(BaseModel):

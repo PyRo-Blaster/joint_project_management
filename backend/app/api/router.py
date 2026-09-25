@@ -9,6 +9,7 @@ from app.api import (
     imports,
     invitations,
     items,
+    tokens,
     updates,
     users,
     vocab,
@@ -19,6 +20,7 @@ api_router.include_router(health.router)
 api_router.include_router(auth.router)
 api_router.include_router(activity.router)
 api_router.include_router(users.router)
+api_router.include_router(tokens.router)
 api_router.include_router(invitations.router)
 api_router.include_router(vocab.router)
 api_router.include_router(items.router)

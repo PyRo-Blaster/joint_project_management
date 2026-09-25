@@ -9,8 +9,11 @@ Kind = Literal["action", "note"]
 Status = Literal["open", "in_progress", "blocked", "on_hold", "completed", "cancelled"]
 Priority = Literal["p1", "p2", "p3"]
 VocabField = Literal["group", "category"]
+Via = Literal["web", "mcp", "cli"]
+TokenScope = Literal["read", "write"]
+WriteMode = Literal["append", "interactive"]
 InvitePurpose = Literal["invite", "reset"]
-EntityType = Literal["item", "user", "invitation", "vocab_term", "import"]
+EntityType = Literal["item", "user", "invitation", "vocab_term", "import", "api_token"]
 AuditAction = Literal[
     "created",
     "updated",
@@ -27,6 +30,8 @@ AuditAction = Literal[
     "revoked",
     "reset_link_issued",
     "imported",
+    "acknowledged",
+    "reverted",
 ]
 
 ORGS: tuple[str, ...] = get_args(Org)
@@ -38,6 +43,9 @@ CLOSED_STATUSES: tuple[str, ...] = ("completed", "cancelled")
 STALE_CANDIDATE_STATUSES: tuple[str, ...] = ("in_progress", "blocked")
 PRIORITIES: tuple[str, ...] = get_args(Priority)
 VOCAB_FIELDS: tuple[str, ...] = get_args(VocabField)
+VIA_SOURCES: tuple[str, ...] = get_args(Via)
+TOKEN_SCOPES: tuple[str, ...] = get_args(TokenScope)
+WRITE_MODES: tuple[str, ...] = get_args(WriteMode)
 INVITE_PURPOSES: tuple[str, ...] = get_args(InvitePurpose)
 ENTITY_TYPES: tuple[str, ...] = get_args(EntityType)
 AUDIT_ACTIONS: tuple[str, ...] = get_args(AuditAction)
@@ -46,6 +54,9 @@ SESSION_COOKIE = "cmc_session"
 CSRF_HEADER = "X-Requested-With"
 CSRF_VALUE = "fetch"
 REQUEST_ID_HEADER = "X-Request-ID"
+TOKEN_PREFIX = "cmct_"
+TOKEN_PREFIX_LENGTH = 12
+BEARER_SCHEME = "bearer "
 
 MIN_PASSWORD_LENGTH = 10
 TITLE_MAX_LENGTH = 500

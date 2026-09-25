@@ -20,6 +20,9 @@ export type ImportCommitOut = S["ImportCommitOut"];
 export type InvitationOut = S["InvitationOut"];
 export type InvitationCreatedOut = S["InvitationCreatedOut"];
 export type ResetLinkOut = S["ResetLinkOut"];
+export type TokenOut = S["TokenOut"];
+export type TokenCreate = S["TokenCreate"];
+export type TokenCreated = S["TokenCreated"];
 
 // Envelope — hand-written; the backend wraps every response in this shape.
 export interface Meta {

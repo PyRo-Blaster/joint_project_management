@@ -10,6 +10,7 @@ from app.constants import CLOSED_STATUSES, STALE_CANDIDATE_STATUSES, STATUSES
 from app.models import ActionItem
 from app.schemas.audit import to_audit_out
 from app.schemas.dashboard import DashboardSummary, NeedsAttention
+from app.services.agent_review import pending_review_items
 from app.services.audit import list_activity
 from app.services.items import last_update_dates, to_item_brief
 
@@ -60,6 +61,8 @@ def build_summary(
     )
     status_counts = Counter(item.status for item in open_items)
     recent, _ = list_activity(db, program_id=program_id, page=1, limit=recent_limit)
+    unreviewed = pending_review_items(db, program_id)
+    unreviewed_latest = last_update_dates(db, [item.id for item in unreviewed])
     return DashboardSummary(
         open_total=len(open_items),
         open_by_status={status: status_counts.get(status, 0) for status in OPEN_STATUSES},
@@ -67,10 +70,12 @@ def build_summary(
         overdue_count=len(overdue),
         due_soon_count=len(due_soon),
         stale_count=len(stale),
+        agent_unreviewed_count=len(unreviewed),
         needs_attention=NeedsAttention(
             overdue=[to_item_brief(i, latest.get(i.id)) for i in overdue],
             due_soon=[to_item_brief(i, latest.get(i.id)) for i in due_soon],
             stale=[to_item_brief(i, latest.get(i.id)) for i in stale],
+            agent_unreviewed=[to_item_brief(i, unreviewed_latest.get(i.id)) for i in unreviewed],
         ),
         by_group=dict(Counter(item.group for item in open_items)),
         by_owner_org=dict(Counter(item.owner_org for item in open_items)),

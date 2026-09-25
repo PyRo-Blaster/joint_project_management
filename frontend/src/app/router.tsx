@@ -5,6 +5,7 @@ import { ItemsPage } from "@/features/items/ItemsPage";
 import { ItemDetailPage } from "@/features/item-detail/ItemDetailPage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { BoardPage } from "@/features/board/BoardPage";
+import { TokensPage } from "@/features/tokens/TokensPage";
 import { AdminLayout } from "@/features/admin/AdminLayout";
 import { UsersPage } from "@/features/admin/users/UsersPage";
 import { VocabPage } from "@/features/admin/vocab/VocabPage";
@@ -27,6 +28,7 @@ export function AppRoutes() {
           <Route path="/items" element={<ItemsPage />} />
           <Route path="/items/:id" element={<ItemDetailPage />} />
           <Route path="/board" element={<BoardPage />} />
+          <Route path="/tokens" element={<TokensPage />} />
           <Route path="/admin" element={<AdminRoute />}>
             <Route element={<AdminLayout />}>
               <Route index element={<Navigate to="/admin/users" replace />} />

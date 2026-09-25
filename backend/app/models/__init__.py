@@ -1,6 +1,7 @@
 """Import every model so Base.metadata is complete for create_all and Alembic."""
 
 from app.models.action_item import ActionItem
+from app.models.api_token import ApiToken
 from app.models.audit_event import AuditEvent
 from app.models.base import Base
 from app.models.invitation import Invitation
@@ -12,6 +13,7 @@ from app.models.vocab_term import VocabTerm
 
 __all__ = [
     "ActionItem",
+    "ApiToken",
     "AuditEvent",
     "Base",
     "Invitation",

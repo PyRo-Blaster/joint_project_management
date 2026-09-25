@@ -65,6 +65,19 @@ export function ItemsPage() {
         <NewItemButton />
       </FilterBar>
 
+      {filters.needs_agent_review && (
+        <p className="flex flex-wrap items-center gap-2 text-sm text-fg-muted">
+          Showing only items with agent work nobody has confirmed yet.
+          <button
+            type="button"
+            className="font-medium text-accent hover:underline"
+            onClick={() => apply({ ...filters, needs_agent_review: false, page: 1 })}
+          >
+            Show all items
+          </button>
+        </p>
+      )}
+
       {items.isLoading ? (
         <div className="flex flex-col gap-2">
           {Array.from({ length: 8 }).map((_, i) => (
