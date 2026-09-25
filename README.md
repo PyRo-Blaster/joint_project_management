@@ -86,6 +86,7 @@ uv run python -m app.cli create-admin someone@example.com --org yarrow
 uv run python -m app.cli import-excel path/to/sheet.xlsx --overrides '{"owner": {"formulation": "gensci"}}' --commit
 uv run python -m app.cli export-excel out.xlsx
 uv run python -m app.cli seed-eval      # fictional MCP evaluation data; empty programme only
+uv run python -m app.cli export-contracts  # regenerate the OpenAPI + MCP contracts in docs/
 ```
 
 ## API notes
@@ -129,6 +130,10 @@ curl -H "Authorization: Bearer cmct_..." http://localhost:8000/api/items
 ```
 
 ### Agent access (MCP)
+
+> **Integrating another system or agent?** Start with
+> [`docs/superpowers/architecture/`](docs/superpowers/architecture/2026-09-25-architecture-and-schema-as-built.md):
+> architecture, schema, permissions, and the generated OpenAPI and MCP contracts.
 
 The container also serves a [Model Context Protocol](https://modelcontextprotocol.io)
 endpoint at `/mcp`, so an agent can read the tracker without driving a browser.

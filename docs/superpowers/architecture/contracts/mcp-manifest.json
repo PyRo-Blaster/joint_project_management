@@ -1,0 +1,1260 @@
+{
+  "server": {
+    "name": "joint-cmc-tracker",
+    "version": "0.1.0",
+    "path": "/mcp/"
+  },
+  "transport": "streamable-http (stateless, JSON responses)",
+  "auth": "Authorization: Bearer cmct_... (an API token; the session cookie is not accepted)",
+  "instructions": "The joint CMC action tracker for programme GS098, shared by GenSci and Yarrow.\n\nItems are numbered; people refer to them as \"#42\", and every tool takes that\nentry number. An item is either an action (it has a status) or a note (a\nrecorded decision, no status). Progress is recorded as dated timeline updates\nrather than by editing history.\n\nCall cmc_list_vocabulary before filtering on or quoting a group or category:\nthe valid values are programme-specific. Read cmc://program/briefing once for\nthe conventions both teams follow.\n\nWriting comes in two kinds. Additive tools apply at once: cmc_post_update appends\na dated note and cmc_create_item files a new item, flagged until a person reviews\nit. Edit tools (cmc_set_status, cmc_update_item, cmc_apply_batch) take two calls:\nthe first changes nothing and returns a diff and a confirm token; show the person\nthe diff, and only when they agree, call again with the token. Title, group,\nowner and kind cannot be edited here. No tool deletes anything, and none ever will.\n\ncmc_export_workbook returns a short-lived download link for a person, not the file.",
+  "tools": [
+    {
+      "name": "cmc_whoami",
+      "description": "Who this token acts as, what it may do, and which programme it reaches. Call this first if you are unsure whether you can write.",
+      "inputSchema": {
+        "properties": {},
+        "title": "cmc_whoamiArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_list_vocabulary",
+      "description": "Every valid value in one call: groups, categories, statuses, priorities, owner organisations, and assignable people with their ids. Call this before filtering on or quoting a group or category.",
+      "inputSchema": {
+        "properties": {},
+        "title": "cmc_list_vocabularyArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_search_items",
+      "description": "Find items, one compact line each. Combine filters freely; omit them all to list everything. Use cmc_get_item for the full record of one item.",
+      "inputSchema": {
+        "properties": {
+          "q": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Free text in title, details or notes",
+            "title": "Q"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. ['open','blocked']",
+            "title": "Status"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. ['p1']",
+            "title": "Priority"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Group"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "owner_org": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "gensci, yarrow or joint",
+            "title": "Owner Org"
+          },
+          "kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "action or note",
+            "title": "Kind"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assignee Id"
+          },
+          "due_before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date, e.g. 2026-10-01",
+            "title": "Due Before"
+          },
+          "due_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due After"
+          },
+          "limit": {
+            "default": 25,
+            "description": "1 to 100",
+            "maximum": 100,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "page": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "sort": {
+            "default": "entry_no",
+            "description": "entry_no, title, status, priority, due_on, raised_on, ...",
+            "title": "Sort",
+            "type": "string"
+          },
+          "direction": {
+            "default": "asc",
+            "enum": [
+              "asc",
+              "desc"
+            ],
+            "title": "Direction",
+            "type": "string"
+          }
+        },
+        "title": "cmc_search_itemsArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_get_item",
+      "description": "The full record of one item by its entry number, with its most recent updates. This is the only tool that returns everything about an item.",
+      "inputSchema": {
+        "properties": {
+          "entry_no": {
+            "description": "The number people cite, as in '#42'",
+            "title": "Entry No",
+            "type": "integer"
+          },
+          "include_updates": {
+            "default": 5,
+            "maximum": 50,
+            "minimum": 0,
+            "title": "Include Updates",
+            "type": "integer"
+          },
+          "include_history": {
+            "default": false,
+            "description": "Also return every recorded change, old to new",
+            "title": "Include History",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entry_no"
+        ],
+        "title": "cmc_get_itemArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_list_updates",
+      "description": "The dated timeline of one item, newest first, with each author.",
+      "inputSchema": {
+        "properties": {
+          "entry_no": {
+            "title": "Entry No",
+            "type": "integer"
+          },
+          "limit": {
+            "default": 20,
+            "maximum": 200,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "page": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_no"
+        ],
+        "title": "cmc_list_updatesArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_get_item_history",
+      "description": "Who changed what on one item and when, with the old and new value of every field. Use this to reconcile a disputed value.",
+      "inputSchema": {
+        "properties": {
+          "entry_no": {
+            "title": "Entry No",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "entry_no"
+        ],
+        "title": "cmc_get_item_historyArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_needs_attention",
+      "description": "Items that need someone: overdue, due soon, or open but stale with no recent update. The same figures the dashboard shows.",
+      "inputSchema": {
+        "properties": {
+          "bucket": {
+            "default": "all",
+            "description": "Which list to return; 'all' returns each in turn",
+            "enum": [
+              "overdue",
+              "due_soon",
+              "stale",
+              "all"
+            ],
+            "title": "Bucket",
+            "type": "string"
+          },
+          "owner_org": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "gensci, yarrow or joint",
+            "title": "Owner Org"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "From cmc_list_vocabulary",
+            "title": "Assignee Id"
+          }
+        },
+        "title": "cmc_needs_attentionArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_list_activity",
+      "description": "Recent changes across the programme, newest first. Agent changes are marked [agent]. Filter by date, person, kind of record, or source.",
+      "inputSchema": {
+        "properties": {
+          "since": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date, e.g. 2026-09-01",
+            "title": "Since"
+          },
+          "limit": {
+            "default": 20,
+            "maximum": 200,
+            "minimum": 1,
+            "title": "Limit",
+            "type": "integer"
+          },
+          "page": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "actor_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Only this person's changes",
+            "title": "Actor Id"
+          },
+          "entity_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "item, user, invitation, vocab_term, import, api_token",
+            "title": "Entity Type"
+          },
+          "via": {
+            "anyOf": [
+              {
+                "enum": [
+                  "web",
+                  "mcp",
+                  "cli"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "'mcp' shows only what agents changed",
+            "title": "Via"
+          }
+        },
+        "title": "cmc_list_activityArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_post_update",
+      "description": "Append a dated progress note to an item's timeline — what the spreadsheet's 'Status Updates' cell used to hold. Additive: it changes no field and never overwrites anything. Use it to record news; use cmc_set_status to change status.",
+      "inputSchema": {
+        "properties": {
+          "entry_no": {
+            "description": "The item's number, as in '#42'",
+            "title": "Entry No",
+            "type": "integer"
+          },
+          "body": {
+            "description": "What happened, in plain English",
+            "title": "Body",
+            "type": "string"
+          },
+          "occurred_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date the news is from; defaults to today",
+            "title": "Occurred On"
+          },
+          "dry_run": {
+            "default": false,
+            "description": "Show what would be posted; change nothing",
+            "title": "Dry Run",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "entry_no",
+          "body"
+        ],
+        "title": "cmc_post_updateArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      }
+    },
+    {
+      "name": "cmc_create_item",
+      "description": "File a new action item or note. Refuses when an existing item has a very similar title — post an update on that one instead, or pass confirm_new=true if it really is separate. The new item is marked unreviewed until a person confirms it. Title, group, owner and kind cannot be changed later by an agent, so get them right here. Call cmc_list_vocabulary first for valid values.",
+      "inputSchema": {
+        "properties": {
+          "title": {
+            "description": "One line, at most 500 chars",
+            "title": "Title",
+            "type": "string"
+          },
+          "group": {
+            "description": "An active group from cmc_list_vocabulary",
+            "title": "Group",
+            "type": "string"
+          },
+          "owner_org": {
+            "description": "gensci, yarrow, or joint",
+            "title": "Owner Org",
+            "type": "string"
+          },
+          "kind": {
+            "default": "action",
+            "description": "action (has a status) or note (no status)",
+            "title": "Kind",
+            "type": "string"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Actions only; defaults to open",
+            "title": "Status"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "p1, p2 or p3",
+            "title": "Priority"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date",
+            "title": "Due On"
+          },
+          "raised_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date; defaults to today",
+            "title": "Raised On"
+          },
+          "details": {
+            "default": "",
+            "title": "Details",
+            "type": "string"
+          },
+          "notes_risks": {
+            "default": "",
+            "title": "Notes Risks",
+            "type": "string"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "From cmc_list_vocabulary",
+            "title": "Assignee Id"
+          },
+          "source": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. 'JSC meeting 2026-09-24'",
+            "title": "Source"
+          },
+          "file_path": {
+            "default": "",
+            "title": "File Path",
+            "type": "string"
+          },
+          "idempotency_key": {
+            "anyOf": [
+              {
+                "maxLength": 64,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Any unique string for this create; a retry with the same key returns the original instead of filing twice",
+            "title": "Idempotency Key"
+          },
+          "confirm_new": {
+            "default": false,
+            "description": "File even though a similar title exists",
+            "title": "Confirm New",
+            "type": "boolean"
+          },
+          "dry_run": {
+            "default": false,
+            "description": "Validate and preview; file nothing",
+            "title": "Dry Run",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "title",
+          "group",
+          "owner_org"
+        ],
+        "title": "cmc_create_itemArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      }
+    },
+    {
+      "name": "cmc_set_status",
+      "description": "Change an action's status, optionally with a timeline note saying why. Two calls: the first returns the diff and a confirm token and changes nothing; show the person the diff, and when they agree call again with the same arguments plus confirm. The change is then flagged for review and undoable in the web app.",
+      "inputSchema": {
+        "properties": {
+          "entry_no": {
+            "description": "The item's number, as in '#42'",
+            "title": "Entry No",
+            "type": "integer"
+          },
+          "status": {
+            "description": "open, in_progress, blocked, on_hold, ...",
+            "title": "Status",
+            "type": "string"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Why, posted to the timeline",
+            "title": "Note"
+          },
+          "confirm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Token from the preview",
+            "title": "Confirm"
+          }
+        },
+        "required": [
+          "entry_no",
+          "status"
+        ],
+        "title": "cmc_set_statusArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    },
+    {
+      "name": "cmc_update_item",
+      "description": "Change an item's live state: due date, priority, category, assignee, details, notes and risks, file path. Title, group, owner and kind are not editable by agents. An empty string clears a value; assignee_id=0 unassigns. Two calls, exactly like cmc_set_status: preview, then confirm.",
+      "inputSchema": {
+        "properties": {
+          "entry_no": {
+            "description": "The item's number, as in '#42'",
+            "title": "Entry No",
+            "type": "integer"
+          },
+          "due_on": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date; empty clears",
+            "title": "Due On"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "p1, p2, p3; empty clears",
+            "title": "Priority"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Active category; empty clears",
+            "title": "Category"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "0 unassigns",
+            "title": "Assignee Id"
+          },
+          "details": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Details"
+          },
+          "notes_risks": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Notes Risks"
+          },
+          "file_path": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "File Path"
+          },
+          "confirm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Token from the preview",
+            "title": "Confirm"
+          }
+        },
+        "required": [
+          "entry_no"
+        ],
+        "title": "cmc_update_itemArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      }
+    },
+    {
+      "name": "cmc_apply_batch",
+      "description": "Apply up to 50 changes as one transaction: status and field changes and timeline posts across several items, for example everything agreed in a meeting. The first call previews all of them under one confirm token; the second applies all or none. A batch of posts alone is additive.",
+      "inputSchema": {
+        "$defs": {
+          "BatchChange": {
+            "additionalProperties": false,
+            "description": "One entry of a batch. Any field left out is left alone.",
+            "properties": {
+              "entry_no": {
+                "title": "Entry No",
+                "type": "integer"
+              },
+              "status": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Status"
+              },
+              "due_on": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "ISO date; empty string clears",
+                "title": "Due On"
+              },
+              "priority": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "p1, p2, p3; empty clears",
+                "title": "Priority"
+              },
+              "category": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "empty string clears",
+                "title": "Category"
+              },
+              "assignee_id": {
+                "anyOf": [
+                  {
+                    "type": "integer"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "0 unassigns",
+                "title": "Assignee Id"
+              },
+              "details": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Details"
+              },
+              "notes_risks": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "Notes Risks"
+              },
+              "file_path": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "title": "File Path"
+              },
+              "post": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "A dated note for the timeline",
+                "title": "Post"
+              },
+              "occurred_on": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "default": null,
+                "description": "Date for the post",
+                "title": "Occurred On"
+              }
+            },
+            "required": [
+              "entry_no"
+            ],
+            "title": "BatchChange",
+            "type": "object"
+          }
+        },
+        "properties": {
+          "changes": {
+            "description": "One entry per item",
+            "items": {
+              "$ref": "#/$defs/BatchChange"
+            },
+            "title": "Changes",
+            "type": "array"
+          },
+          "confirm": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Token from the preview",
+            "title": "Confirm"
+          }
+        },
+        "required": [
+          "changes"
+        ],
+        "title": "cmc_apply_batchArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": false,
+        "destructiveHint": false,
+        "idempotentHint": false
+      }
+    },
+    {
+      "name": "cmc_export_workbook",
+      "description": "An Excel workbook of the items matching the same filters as cmc_search_items, in the familiar 'Action Item' layout. Returns a download link valid for 15 minutes and a summary of what it holds, not the file itself: give the link to the person. kind='period_report' is reserved for the monthly or quarterly report and is not available yet.",
+      "inputSchema": {
+        "properties": {
+          "kind": {
+            "default": "items",
+            "enum": [
+              "items",
+              "period_report"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "q": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Free text in title, details or notes",
+            "title": "Q"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. ['open','blocked']",
+            "title": "Status"
+          },
+          "priority": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "e.g. ['p1']",
+            "title": "Priority"
+          },
+          "group": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Group"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Category"
+          },
+          "owner_org": {
+            "anyOf": [
+              {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "gensci, yarrow or joint",
+            "title": "Owner Org"
+          },
+          "item_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "action or note",
+            "title": "Item Kind"
+          },
+          "assignee_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Assignee Id"
+          },
+          "due_before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "ISO date, e.g. 2026-10-01",
+            "title": "Due Before"
+          },
+          "due_after": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Due After"
+          },
+          "from_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Period start, ISO date; period_report only",
+            "title": "From Date"
+          },
+          "to_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "description": "Period end, ISO date; period_report only",
+            "title": "To Date"
+          }
+        },
+        "title": "cmc_export_workbookArguments",
+        "type": "object"
+      },
+      "annotations": {
+        "readOnlyHint": true,
+        "destructiveHint": false,
+        "idempotentHint": true
+      }
+    }
+  ],
+  "resources": [
+    {
+      "name": "Programme briefing",
+      "uri": "cmc://program/briefing",
+      "description": "Conventions, vocabularies, and what the statuses mean. Read this once.",
+      "mimeType": "text/markdown"
+    }
+  ],
+  "prompts": [
+    {
+      "name": "weekly_update",
+      "title": "Draft this week's updates",
+      "description": "Drafts one progress note per open item in a group from the last week's activity, for a person to review before anything is posted.",
+      "arguments": [
+        {
+          "name": "group",
+          "required": true
+        }
+      ]
+    },
+    {
+      "name": "meeting_minutes_to_changes",
+      "title": "Turn meeting minutes into tracker changes",
+      "description": "Reads pasted minutes and prepares one cmc_apply_batch preview of every status change, date change and note they imply, for the person to confirm.",
+      "arguments": [
+        {
+          "name": "minutes",
+          "required": true
+        }
+      ]
+    }
+  ]
+}
