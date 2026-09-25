@@ -152,6 +152,19 @@ def export_excel(out: Annotated[Path, typer.Argument(dir_okay=False)]) -> None:
     typer.echo(f"wrote {out}")
 
 
+@cli.command("export-contracts")
+def export_contracts(
+    out_dir: Annotated[Path, typer.Argument(file_okay=False)] = Path(
+        "../docs/superpowers/architecture/contracts"
+    ),
+) -> None:
+    """Write the OpenAPI document and the MCP manifest for integrators."""
+    from app.contracts import write_contracts
+
+    for path in write_contracts(out_dir):
+        typer.echo(f"wrote {path}")
+
+
 @cli.command("seed-eval")
 def seed_eval() -> None:
     """Load the fictional evaluation dataset (docs/mcp/evaluation.xml) into an empty programme."""
