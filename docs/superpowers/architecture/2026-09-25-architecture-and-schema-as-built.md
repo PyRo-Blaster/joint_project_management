@@ -92,13 +92,13 @@ flowchart LR
 <!-- diagram: 02-components -->
 ```mermaid
 flowchart TB
-    mw["HTTP layer (app/main.py)<br/>X-Request-ID · CSRF header on /api writes · errors → JSON envelope"]
+    mw["HTTP layer (app/main.py)<br/>X-Request-ID · CSRF header on /api writes · security headers + CSP<br/>errors → JSON envelope"]
 
     subgraph adapters["Adapters: validate, call a service, shape the reply"]
         direction LR
         spa["SPA static files<br/>/"]
         rest["app/api (REST)<br/>CurrentUser · AdminUser · SessionUser<br/>API tokens are GET-only"]
-        mcp["app/mcp (MCPServer, stateless HTTP)<br/>StrictArguments → call_tool:<br/>token → kill switch · scope · mode → rate limit<br/>14 tools · 2 prompts · 1 resource<br/>confirm tokens (HMAC)"]
+        mcp["app/mcp (MCPServer, stateless HTTP)<br/>BearerGate: no live token → 401<br/>StrictArguments → call_tool:<br/>kill switch · scope · mode → rate limit<br/>14 tools · 2 prompts · 1 resource<br/>confirm tokens (HMAC)"]
         cli["app/cli.py<br/>bootstrap · import/export<br/>tokens · seed-eval · contracts"]
     end
 
@@ -305,14 +305,14 @@ old items carry them). Seeded groups: `General Issues`, `Gen1 (existing) CMC`,
 
 | Rule | How it is held |
 |---|---|
-| `entry_no` is the human handle, unique per programme, never reused | `uq_action_item_program_id_entry_no`; next = max + 1, counting deleted items |
+| `entry_no` is the human handle, unique per programme, never reused | `uq_action_item_program_id_entry_no`; next = max + 1, counting deleted items; a create that loses the race to a concurrent one retries with the next number |
 | An action has a status, a note has none | `ck_action_item_status_matches_kind` |
 | A create retried with the same idempotency key files once | `uq_action_item_program_id_idempotency_key` (retry window `IDEMPOTENCY_TTL_HOURS`) |
 | Deleting is soft and reversible | `deleted_at`/`deleted_by`; restore is admin-only; deleted items are invisible to MCP |
 | Secrets are never stored in the clear | `token_hash` (SHA-256) for sessions, invitations and API tokens; `password_hash` argon2 |
 | A timeline note belongs to one item | `item_update.item_id` ON DELETE CASCADE (never triggered: items are soft-deleted) |
 | Every data change is audited in the same transaction | `services.audit.record_event` is called inside each service before its commit |
-| An undo points at what it undid | `audit_event.reverted_by_event_id` → the `reverted` event |
+| An undo points at what it undid, and a change is undone at most once | `audit_event.reverted_by_event_id` → the `reverted` event, claimed with a compare-and-set so two concurrent undos cannot both land |
 | Lookups stay fast | `ix_action_item_program_status`, `ix_action_item_program_due`, `ix_item_update_item_occurred`, `ix_audit_event_entity`, `ix_audit_event_occurred_at`, `ix_api_token_user_id`, `ix_user_session_user_id`, `ix_invitation_email` |
 
 Note the one naming mismatch: the Python attribute and every API field is
@@ -424,8 +424,15 @@ docs at `/api/docs` on a running server.
   `X-Requested-With: fetch` (CSRF guard), else 403 `csrf_missing`.
 - **Tracing:** send or receive `X-Request-ID`; it is echoed and logged.
 - **Errors:** `401 unauthenticated`, `403 forbidden`, `404 not_found`,
-  `409 conflict`, `410 link_expired`, `422 validation_error` (with `fields`),
+  `409 conflict`, `410 link_expired`, `422 validation_error` (with `fields`;
+  also for an id or number too large for the database),
   `429 rate_limited` (login), `500 internal_error` (quote the request id).
+- **Limits:** path and body ids 1…2,147,483,647; `page` ≤ 100,000; update
+  bodies ≤ 20,000 characters.
+- **Security headers** on every response: `X-Content-Type-Options: nosniff`,
+  `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, and a
+  `Content-Security-Policy` allowing only the app's own scripts (not on
+  `/api/docs`, whose Swagger UI loads from a CDN).
 - **Ids:** REST uses the internal `id`; people and MCP use `entry_no`. Both are
   in every item payload.
 - **Dates** are ISO `YYYY-MM-DD`; timestamps are naive UTC ISO 8601.
@@ -482,13 +489,20 @@ Full schemas: [`contracts/mcp-manifest.json`](contracts/mcp-manifest.json).
   `POST /mcp/` (note the trailing slash). Protocol version negotiated by
   `initialize`; each request is independent, so `tools/list` and `tools/call`
   work without a session id.
-- **Auth:** `Authorization: Bearer cmct_…` on every request. No cookie.
+- **Auth:** `Authorization: Bearer cmct_…` on every request, the `initialize`
+  handshake included. No cookie. Without a live token the transport answers
+  **HTTP 401** with `WWW-Authenticate: Bearer realm="joint-cmc-tracker"` (plus
+  `error="invalid_token"` for a bad one) and a JSON-RPC error (code `-32001`)
+  whose message says why: unknown, revoked or expired (with the date), or a
+  deactivated owner.
 - **Results are text** (`content[0].type = "text"`), written for a model to
   read: one line per item in lists, everything for one item in detail. There is
   no `structuredContent`.
-- **Errors** are tool results with `isError: true` and a sentence saying what to
-  do next (valid values, "did you mean", which tool to call). An argument a tool
-  does not take is refused by name, never silently dropped.
+- **Errors** past authentication are tool results with `isError: true` and a
+  sentence saying what to do next (valid values, "did you mean", which tool to
+  call). An argument a tool does not take is refused by name, never silently
+  dropped. Ids and entry numbers are bounded to 1…2,147,483,647, `page` to
+  100,000, and update bodies and notes to 20,000 characters.
 - **Items are addressed by `entry_no`.** Deleted items do not exist here.
 - **Rate limits:** per token, 600 reads and 60 writes a minute (in memory, per
   process).
@@ -517,8 +531,8 @@ Class decides who may call it: **read** needs `read`; **append** needs `write`;
 **edit** needs `write` and `interactive` mode. No tool deletes, restores,
 manages people, vocabulary or tokens, or imports.
 
-Resource: `cmc://program/briefing` (conventions both teams follow; readable
-without a token, holds no item data). Prompts: `weekly_update(group)`,
+Resource: `cmc://program/briefing` (conventions both teams follow; holds no
+item data, but like everything here it needs a token). Prompts: `weekly_update(group)`,
 `meeting_minutes_to_changes(minutes)`.
 
 ### 7.3 One tool call, end to end
@@ -528,22 +542,25 @@ without a token, holds no item data). Prompts: `weekly_update(group)`,
 sequenceDiagram
     autonumber
     participant A as Agent
+    participant G as BearerGate<br/>(ASGI, before the protocol)
     participant T as /mcp transport<br/>(MCPServer, stateless)
     participant S as StrictArguments
     participant R as runtime.call_tool<br/>(worker thread)
     participant V as services
     participant D as database
 
-    A->>T: POST /mcp/ tools/call {name, arguments}<br/>Authorization: Bearer cmct_…
+    A->>G: POST /mcp/ tools/call {name, arguments}<br/>Authorization: Bearer cmct_…
+    G->>D: resolve token (hash lookup)
+    alt none / unknown / revoked / expired / owner inactive
+        G-->>A: HTTP 401, WWW-Authenticate: Bearer …<br/>JSON-RPC error naming why
+    end
+    G->>T: request
     T->>S: raw arguments
     alt an argument the tool does not take
         S-->>A: isError: "cmc_x does not take 'y'. Its arguments are … did you mean …"
     end
     S->>R: validated arguments
-    R->>D: resolve token (hash lookup, last_used_at)
-    alt unknown / revoked / expired / owner inactive
-        R-->>A: isError naming why, with the date
-    end
+    R->>D: caller = token's user (last_used_at, at most once a minute)
     R->>R: kill switch → write scope → interactive mode (edits) → rate limit
     R->>V: tool body, principal = (via "mcp", token name)
     V->>D: read, or write + audit_event in one transaction
