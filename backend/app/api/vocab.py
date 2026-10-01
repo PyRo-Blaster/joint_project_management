@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.deps import AdminUser, CurrentUser, DbDep, ProgramDep
+from app.api.deps import AdminUser, CurrentUser, DbDep, IdPath, ProgramDep
 from app.constants import VocabField
 from app.schemas.common import Envelope, ok
 from app.schemas.vocab import VocabTermCreate, VocabTermOut, VocabTermPatch
@@ -24,6 +24,8 @@ def create(payload: VocabTermCreate, admin: AdminUser, db: DbDep, program: Progr
 
 
 @router.patch("/{term_id}", response_model=Envelope[VocabTermOut])
-def patch(term_id: int, payload: VocabTermPatch, admin: AdminUser, db: DbDep, program: ProgramDep):
+def patch(
+    term_id: IdPath, payload: VocabTermPatch, admin: AdminUser, db: DbDep, program: ProgramDep
+):
     term = update_term(db, actor=admin, term=get_term(db, program.id, term_id), patch=payload)
     return ok(VocabTermOut.model_validate(term))

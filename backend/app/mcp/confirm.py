@@ -44,12 +44,16 @@ def _canonical(value: Any) -> str:
     return json.dumps(value, sort_keys=True, separators=(",", ":"), default=str)
 
 
+def _key() -> bytes:
+    # Derived, so a confirm token never shares a key with sessions or signed links.
+    return hmac.new(get_settings().secret_key.encode(), b"confirm-token", hashlib.sha256).digest()
+
+
 def _sign(tool: str, caller_token_id: int, request: Any, issued: str, expires: str) -> str:
     message = _canonical(
         {"tool": tool, "who": caller_token_id, "req": request, "iat": issued, "exp": expires}
     )
-    key = get_settings().secret_key.encode()
-    return hmac.new(key, message.encode(), hashlib.sha256).hexdigest()[:32]
+    return hmac.new(_key(), message.encode(), hashlib.sha256).hexdigest()[:32]
 
 
 def _encode(envelope: dict) -> str:

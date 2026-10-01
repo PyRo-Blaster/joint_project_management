@@ -2,12 +2,12 @@
 
 from typing import Annotated
 
-from fastapi import Depends, Request
+from fastapi import Depends, Path, Request
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import Settings, get_settings
-from app.constants import BEARER_SCHEME, SESSION_COOKIE
+from app.constants import BEARER_SCHEME, MAX_DB_INT, SESSION_COOKIE
 from app.db import get_db
 from app.models import Program, User
 from app.services.auth import resolve_session
@@ -87,3 +87,6 @@ def get_program(db: DbDep, settings: SettingsDep) -> Program:
 
 
 ProgramDep = Annotated[Program, Depends(get_program)]
+
+# A database id: larger values cannot exist and would crash the driver when bound.
+IdPath = Annotated[int, Path(ge=1, le=MAX_DB_INT)]

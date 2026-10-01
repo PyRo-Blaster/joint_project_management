@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.deps import AdminUser, DbDep, SettingsDep
+from app.api.deps import AdminUser, DbDep, IdPath, SettingsDep
 from app.schemas.auth import AcceptInviteRequest
 from app.schemas.common import Envelope, ok
 from app.schemas.invitations import InvitationCreate, InvitationCreatedOut, InvitationOut
@@ -38,7 +38,7 @@ def create(payload: InvitationCreate, admin: AdminUser, db: DbDep, settings: Set
 
 
 @router.delete("/invitations/{invitation_id}", response_model=Envelope[InvitationOut])
-def revoke(invitation_id: int, admin: AdminUser, db: DbDep):
+def revoke(invitation_id: IdPath, admin: AdminUser, db: DbDep):
     invitation = revoke_invitation(db, actor=admin, invitation=get_invitation(db, invitation_id))
     return ok(InvitationOut.model_validate(invitation))
 

@@ -144,7 +144,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 2147483647,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -200,6 +202,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100000,
               "minimum": 1,
               "default": 1,
               "title": "Page"
@@ -257,6 +260,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Event Id"
             }
           }
@@ -341,6 +346,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "User Id"
             }
           }
@@ -393,6 +400,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "User Id"
             }
           }
@@ -518,6 +527,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Token Id"
             }
           }
@@ -620,6 +631,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Invitation Id"
             }
           }
@@ -795,6 +808,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Term Id"
             }
           }
@@ -871,6 +886,7 @@
             "required": false,
             "schema": {
               "type": "integer",
+              "maximum": 100000,
               "minimum": 1,
               "default": 1,
               "title": "Page"
@@ -1028,7 +1044,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 2147483647,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -1175,6 +1193,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1215,6 +1235,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1265,6 +1287,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1307,6 +1331,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1349,6 +1375,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1392,6 +1420,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1434,6 +1464,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1474,6 +1506,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           }
@@ -1526,6 +1560,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           },
@@ -1535,6 +1571,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Update Id"
             }
           }
@@ -1585,6 +1623,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Item Id"
             }
           },
@@ -1594,6 +1634,8 @@
             "required": true,
             "schema": {
               "type": "integer",
+              "maximum": 2147483647,
+              "minimum": 1,
               "title": "Update Id"
             }
           }
@@ -1874,7 +1916,9 @@
             "schema": {
               "anyOf": [
                 {
-                  "type": "integer"
+                  "type": "integer",
+                  "maximum": 2147483647,
+                  "minimum": 1
                 },
                 {
                   "type": "null"
@@ -3731,7 +3775,9 @@
           "assignee_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -4129,7 +4175,9 @@
           "assignee_id": {
             "anyOf": [
               {
-                "type": "integer"
+                "type": "integer",
+                "maximum": 2147483647.0,
+                "minimum": 1.0
               },
               {
                 "type": "null"
@@ -4648,6 +4696,7 @@
         "properties": {
           "body": {
             "type": "string",
+            "maxLength": 20000,
             "minLength": 1,
             "title": "Body"
           },
@@ -4739,6 +4788,7 @@
             "anyOf": [
               {
                 "type": "string",
+                "maxLength": 20000,
                 "minLength": 1
               },
               {

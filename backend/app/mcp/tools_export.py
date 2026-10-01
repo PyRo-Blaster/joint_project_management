@@ -7,6 +7,7 @@ from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import Field
 from sqlalchemy.orm import Session
 
+from app.constants import MAX_DB_INT
 from app.exporters.excel import EXPORT_HEADERS, EXPORT_ROW_LIMIT
 from app.mcp.runtime import Caller, call_tool
 from app.mcp.tools_read import READ_ONLY, build_filters
@@ -47,7 +48,7 @@ def register(server: MCPServer) -> None:
         category: list[str] | None = None,
         owner_org: Annotated[list[str] | None, Field(description="org_a, org_b or joint")] = None,
         item_kind: Annotated[str | None, Field(description="action or note")] = None,
-        assignee_id: int | None = None,
+        assignee_id: Annotated[int | None, Field(ge=1, le=MAX_DB_INT)] = None,
         due_before: Annotated[str | None, Field(description="ISO date, e.g. 2026-10-01")] = None,
         due_after: str | None = None,
         from_date: Annotated[

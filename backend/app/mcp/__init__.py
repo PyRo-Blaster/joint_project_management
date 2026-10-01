@@ -57,12 +57,15 @@ def build_mcp_server() -> MCPServer:
 def mcp_asgi_app(settings: Settings) -> Starlette:
     """Streamable HTTP, stateless, to be mounted under /mcp by the caller.
 
+    Every request must carry a live API token; the gate answers 401 otherwise.
     Host checking stays off unless MCP_ALLOWED_HOSTS is set: this endpoint takes
     no ambient credential (bearer tokens only, never the session cookie), so DNS
     rebinding has nothing to steal.
     """
+    from app.mcp.gate import BearerGate
+
     hosts = [host.strip() for host in settings.mcp_allowed_hosts.split(",") if host.strip()]
-    return build_mcp_server().streamable_http_app(
+    app = build_mcp_server().streamable_http_app(
         streamable_http_path="/",
         stateless_http=True,
         json_response=True,
@@ -71,3 +74,6 @@ def mcp_asgi_app(settings: Settings) -> Starlette:
             allowed_hosts=hosts,
         ),
     )
+    # Every request, the protocol handshake included, needs a live token (401 otherwise).
+    app.add_middleware(BearerGate)
+    return app

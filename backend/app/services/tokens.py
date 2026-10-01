@@ -14,6 +14,7 @@ from app.services.auth import generate_token, hash_token
 from app.services.errors import ConflictError, ForbiddenError, InvalidInputError, NotFoundError
 
 DEFAULT_TTL_DAYS = 90
+LAST_USED_RESOLUTION = timedelta(minutes=1)
 
 
 def _normalize_scopes(scopes: Sequence[str] | None) -> str:
@@ -149,7 +150,7 @@ def why_refused(db: Session, raw: str) -> str:
 
 
 def resolve_token(db: Session, raw: str) -> ApiToken | None:
-    """Return the live token for a raw bearer value, sliding ``last_used_at`` forward."""
+    """Return the live token for a raw bearer value, moving ``last_used_at`` forward."""
     candidate = (raw or "").strip()
     if not candidate.startswith(TOKEN_PREFIX):
         return None
@@ -161,6 +162,9 @@ def resolve_token(db: Session, raw: str) -> ApiToken | None:
         return None
     if not token.user.is_active:
         return None
-    token.last_used_at = now
-    db.commit()
+    # A minute's precision is all "last used" needs; writing on every call would turn
+    # each read into a write and serialise agents on SQLite.
+    if token.last_used_at is None or now - token.last_used_at >= LAST_USED_RESOLUTION:
+        token.last_used_at = now
+        db.commit()
     return token

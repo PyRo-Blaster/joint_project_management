@@ -9,6 +9,7 @@ import anyio.to_thread
 from mcp.server.mcpserver.exceptions import ToolError
 from pydantic import ValidationError
 from sqlalchemy import select
+from sqlalchemy.exc import DataError
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -153,12 +154,18 @@ async def call_tool(ctx: Any, body: ToolBody, *, kind: ToolKind = "read") -> str
                 return body(db, caller, current_program(db))
         except (DomainError, ValidationError) as exc:
             raise ToolError(describe_error(exc)) from exc
+        except (OverflowError, DataError) as exc:
+            raise ToolError(
+                "A number in the request is too large for the tracker. Entry numbers and ids "
+                "come from cmc_search_items and cmc_list_vocabulary."
+            ) from exc
 
     return await anyio.to_thread.run_sync(run)
 
 
 async def call_unauthenticated(body: Callable[[Session], str]) -> str:
-    """For a resource that exposes programme conventions only, never item data."""
+    """For a resource that holds programme conventions only, never item data. It needs
+    no caller of its own; the transport gate has already required a live token."""
 
     def run() -> str:
         try:

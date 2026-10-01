@@ -5,6 +5,7 @@ from datetime import date
 from difflib import SequenceMatcher
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.constants import STATUS_LABELS
@@ -15,6 +16,8 @@ from app.services.agent_review import acknowledge_on_human_edit, pending_review_
 from app.services.audit import diff_changes, record_event
 from app.services.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.vocab import active_values
+
+ENTRY_NO_ATTEMPTS = 5
 
 SNAPSHOT_FIELDS = (
     "kind",
@@ -250,6 +253,37 @@ def _resolve_kind_and_status(item: ActionItem, data: dict) -> None:
         _validate_status_for_kind(item.kind, data["status"])
 
 
+def _insert_with_next_entry_no(
+    db: Session, program: Program, fields: dict, idempotency_key: str | None
+) -> ActionItem:
+    """Insert, taking the next entry number, and retry if a concurrent create took it.
+
+    The number is read as max + 1 outside any write lock, so two creates at the same
+    moment can pick the same one; the unique constraint stops the second. Nothing
+    else is pending in the session when an item is created, so rolling back and
+    reading the number again is safe.
+    """
+    for _ in range(ENTRY_NO_ATTEMPTS):
+        item = ActionItem(entry_no=next_entry_no(db, program.id), **fields)
+        db.add(item)
+        try:
+            db.flush()
+            return item
+        except IntegrityError as exc:
+            db.rollback()
+            if idempotency_key:
+                earlier = find_by_idempotency_key(db, program.id, idempotency_key)
+                if earlier is not None:
+                    raise ConflictError(
+                        f"Already filed as #{earlier.entry_no} with this idempotency key."
+                    ) from exc
+            if "entry_no" not in str(exc.orig):
+                raise
+    raise ConflictError(
+        "Could not assign an entry number: others were filing at the same moment. Try again."
+    )
+
+
 def create_item(
     db: Session,
     *,
@@ -266,9 +300,8 @@ def create_item(
     if data.kind == "note":
         _validate_status_for_kind("note", data.status)
     status = None if data.kind == "note" else (data.status or "open")
-    item = ActionItem(
+    fields = dict(
         program_id=program.id,
-        entry_no=next_entry_no(db, program.id),
         kind=data.kind,
         title=data.title.strip(),
         details=data.details,
@@ -288,8 +321,7 @@ def create_item(
         updated_by=actor.id,
         idempotency_key=idempotency_key,
     )
-    db.add(item)
-    db.flush()
+    item = _insert_with_next_entry_no(db, program, fields, idempotency_key)
     record_event(
         db,
         actor=actor,

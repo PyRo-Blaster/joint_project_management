@@ -2,7 +2,7 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.constants import TITLE_MAX_LENGTH, Kind, OwnerOrg, Priority, Status
+from app.constants import MAX_DB_INT, TITLE_MAX_LENGTH, Kind, OwnerOrg, Priority, Status
 
 
 class ItemCreate(BaseModel):
@@ -12,7 +12,7 @@ class ItemCreate(BaseModel):
     group: str = Field(min_length=1, max_length=200)
     category: str | None = Field(default=None, max_length=200)
     owner_org: OwnerOrg
-    assignee_id: int | None = None
+    assignee_id: int | None = Field(default=None, ge=1, le=MAX_DB_INT)
     status: Status | None = None
     priority: Priority | None = None
     raised_on: date | None = None
@@ -29,7 +29,7 @@ class ItemPatch(BaseModel):
     group: str | None = Field(default=None, min_length=1, max_length=200)
     category: str | None = Field(default=None, max_length=200)
     owner_org: OwnerOrg | None = None
-    assignee_id: int | None = None
+    assignee_id: int | None = Field(default=None, ge=1, le=MAX_DB_INT)
     status: Status | None = None
     priority: Priority | None = None
     raised_on: date | None = None

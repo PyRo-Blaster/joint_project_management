@@ -5,8 +5,8 @@ from typing import Annotated
 
 from fastapi import APIRouter, Query
 
-from app.api.deps import CurrentUser, DbDep, ProgramDep, SessionUser
-from app.constants import MAX_PAGE_LIMIT, EntityType, Org
+from app.api.deps import CurrentUser, DbDep, IdPath, ProgramDep, SessionUser
+from app.constants import MAX_DB_INT, MAX_PAGE, MAX_PAGE_LIMIT, EntityType, Org
 from app.models import AuditEvent, User
 from app.schemas.audit import AuditEventOut, to_audit_out
 from app.schemas.common import Envelope, Meta, ok
@@ -22,10 +22,10 @@ def activity(
     _user: CurrentUser,
     db: DbDep,
     org: Org | None = None,
-    actor_id: int | None = None,
+    actor_id: Annotated[int | None, Query(ge=1, le=MAX_DB_INT)] = None,
     entity_type: EntityType | None = None,
     since: datetime | None = None,
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = 20,
 ):
     rows, total = list_activity(
@@ -38,7 +38,7 @@ def activity(
 
 
 @router.post("/{event_id}/revert", response_model=Envelope[AuditEventOut])
-def revert(event_id: int, user: SessionUser, db: DbDep, program: ProgramDep):
+def revert(event_id: IdPath, user: SessionUser, db: DbDep, program: ProgramDep):
     """Undo a field change. Refused, with the reason, when it was already undone, is
     outside the undo window, or a field has changed again since."""
     event = db.get(AuditEvent, event_id)

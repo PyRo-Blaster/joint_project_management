@@ -148,6 +148,8 @@
           "assignee_id": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -192,6 +194,7 @@
           },
           "page": {
             "default": 1,
+            "maximum": 100000,
             "minimum": 1,
             "title": "Page",
             "type": "integer"
@@ -228,6 +231,8 @@
         "properties": {
           "entry_no": {
             "description": "The number people cite, as in '#42'",
+            "maximum": 2147483647,
+            "minimum": 1,
             "title": "Entry No",
             "type": "integer"
           },
@@ -263,6 +268,8 @@
       "inputSchema": {
         "properties": {
           "entry_no": {
+            "maximum": 2147483647,
+            "minimum": 1,
             "title": "Entry No",
             "type": "integer"
           },
@@ -275,6 +282,7 @@
           },
           "page": {
             "default": 1,
+            "maximum": 100000,
             "minimum": 1,
             "title": "Page",
             "type": "integer"
@@ -298,6 +306,8 @@
       "inputSchema": {
         "properties": {
           "entry_no": {
+            "maximum": 2147483647,
+            "minimum": 1,
             "title": "Entry No",
             "type": "integer"
           }
@@ -347,6 +357,8 @@
           "assignee_id": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -394,6 +406,7 @@
           },
           "page": {
             "default": 1,
+            "maximum": 100000,
             "minimum": 1,
             "title": "Page",
             "type": "integer"
@@ -401,6 +414,8 @@
           "actor_id": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -459,11 +474,14 @@
         "properties": {
           "entry_no": {
             "description": "The item's number, as in '#42'",
+            "maximum": 2147483647,
+            "minimum": 1,
             "title": "Entry No",
             "type": "integer"
           },
           "body": {
             "description": "What happened, in plain English",
+            "maxLength": 20000,
             "title": "Body",
             "type": "string"
           },
@@ -603,6 +621,8 @@
           "assignee_id": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": 1,
                 "type": "integer"
               },
               {
@@ -679,6 +699,8 @@
         "properties": {
           "entry_no": {
             "description": "The item's number, as in '#42'",
+            "maximum": 2147483647,
+            "minimum": 1,
             "title": "Entry No",
             "type": "integer"
           },
@@ -690,6 +712,7 @@
           "note": {
             "anyOf": [
               {
+                "maxLength": 20000,
                 "type": "string"
               },
               {
@@ -734,6 +757,8 @@
         "properties": {
           "entry_no": {
             "description": "The item's number, as in '#42'",
+            "maximum": 2147483647,
+            "minimum": 1,
             "title": "Entry No",
             "type": "integer"
           },
@@ -779,6 +804,8 @@
           "assignee_id": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": 0,
                 "type": "integer"
               },
               {
@@ -861,6 +888,8 @@
             "description": "One entry of a batch. Any field left out is left alone.",
             "properties": {
               "entry_no": {
+                "maximum": 2147483647,
+                "minimum": 1,
                 "title": "Entry No",
                 "type": "integer"
               },
@@ -918,6 +947,8 @@
               "assignee_id": {
                 "anyOf": [
                   {
+                    "maximum": 2147483647,
+                    "minimum": 0,
                     "type": "integer"
                   },
                   {
@@ -967,6 +998,7 @@
               "post": {
                 "anyOf": [
                   {
+                    "maxLength": 20000,
                     "type": "string"
                   },
                   {
@@ -1154,6 +1186,8 @@
           "assignee_id": {
             "anyOf": [
               {
+                "maximum": 2147483647,
+                "minimum": 1,
                 "type": "integer"
               },
               {
