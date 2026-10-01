@@ -94,6 +94,11 @@ def build_export(
                 cell.number_format = DATETIME_FORMAT
             elif isinstance(cell.value, date):
                 cell.number_format = DATE_FORMAT
+            elif isinstance(cell.value, str):
+                # openpyxl stores text starting with "=" as a live formula, so a title
+                # like =HYPERLINK(...) would run when the workbook opens. Force text;
+                # the value is unchanged, so a re-import reads back exactly what was here.
+                cell.data_type = "s"
             cell.alignment = Alignment(wrap_text=True, vertical="top")
     sheet.freeze_panes = "A2"
     buffer = BytesIO()

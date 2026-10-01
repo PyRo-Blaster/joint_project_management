@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.deps import AdminUser, CurrentUser, DbDep, SettingsDep
+from app.api.deps import AdminUser, CurrentUser, DbDep, IdPath, SettingsDep
 from app.schemas.common import Envelope, ok
 from app.schemas.users import ResetLinkOut, UserBrief, UserOut, UserPatch
 from app.services.invitations import create_reset_link
@@ -22,13 +22,13 @@ def directory(_user: CurrentUser, db: DbDep):
 
 
 @router.patch("/{user_id}", response_model=Envelope[UserOut])
-def patch(user_id: int, payload: UserPatch, admin: AdminUser, db: DbDep):
+def patch(user_id: IdPath, payload: UserPatch, admin: AdminUser, db: DbDep):
     user = update_user(db, actor=admin, user=get_user(db, user_id), patch=payload)
     return ok(UserOut.model_validate(user))
 
 
 @router.post("/{user_id}/reset-link", response_model=Envelope[ResetLinkOut], status_code=201)
-def reset_link(user_id: int, admin: AdminUser, db: DbDep, settings: SettingsDep):
+def reset_link(user_id: IdPath, admin: AdminUser, db: DbDep, settings: SettingsDep):
     invitation, url = create_reset_link(
         db,
         actor=admin,

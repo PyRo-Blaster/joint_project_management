@@ -15,11 +15,12 @@ from app.db import session_scope
 from app.exporters.excel import build_program_export
 from app.importers.excel.commit import run_import
 from app.importers.excel.preview import ImportPreview
-from app.models import Program, User
+from app.models import ApiToken, Program, User
 from app.schemas.imports import ImportOverrides
 from app.services.bootstrap import run_bootstrap
 from app.services.errors import DomainError
 from app.services.items import ItemFilters
+from app.services.tokens import create_token, list_tokens, revoke_token
 from app.services.users import create_user
 
 cli = typer.Typer(help="Joint CMC tracker maintenance commands", no_args_is_help=True)
@@ -149,6 +150,115 @@ def export_excel(out: Annotated[Path, typer.Argument(dir_okay=False)]) -> None:
         content = build_program_export(db, _program(db).id, ItemFilters())
     out.write_bytes(content)
     typer.echo(f"wrote {out}")
+
+
+@cli.command("export-contracts")
+def export_contracts(
+    out_dir: Annotated[Path, typer.Argument(file_okay=False)] = Path(
+        "../docs/superpowers/architecture/contracts"
+    ),
+) -> None:
+    """Write the OpenAPI document and the MCP manifest for integrators."""
+    from app.contracts import write_contracts
+
+    for path in write_contracts(out_dir):
+        typer.echo(f"wrote {path}")
+
+
+@cli.command("seed-eval")
+def seed_eval() -> None:
+    """Load the fictional evaluation dataset (docs/mcp/evaluation.xml) into an empty programme."""
+    from app.evaluation.seed import seed_evaluation
+
+    with session_scope() as db:
+        try:
+            count = seed_evaluation(db, actor=_actor(db, None), program=_program(db))
+        except DomainError as exc:
+            raise typer.BadParameter(exc.message) from exc
+    typer.echo(f"seeded {count} evaluation items")
+
+
+token_cli = typer.Typer(help="Manage API tokens for agents", no_args_is_help=True)
+cli.add_typer(token_cli, name="token")
+
+
+def _user_by_email(db: Session, email: str) -> User:
+    user = db.scalar(select(User).where(User.email == email.strip().lower()))
+    if user is None:
+        raise typer.BadParameter(f"No user with email {email}")
+    return user
+
+
+@token_cli.command("create")
+def token_create(
+    email: Annotated[str, typer.Argument(help="Owner of the token")],
+    name: Annotated[str, typer.Option(help="Label, e.g. 'Claude Code'")],
+    scopes: Annotated[str, typer.Option(help="Comma separated: read, write")] = "read",
+    write_mode: Annotated[
+        str | None, typer.Option(help="append or interactive; default MCP_DEFAULT_WRITE_MODE")
+    ] = None,
+    ttl_days: Annotated[
+        int | None, typer.Option(help="0 means never expires; default MCP_TOKEN_TTL_DAYS")
+    ] = None,
+    actor: Annotated[str | None, typer.Option(help="Acting admin's email")] = None,
+) -> None:
+    """Create an API token and print it once."""
+    with session_scope() as db:
+        try:
+            token, raw = create_token(
+                db,
+                actor=_actor(db, actor),
+                owner=_user_by_email(db, email),
+                name=name,
+                scopes=[part.strip() for part in scopes.split(",") if part.strip()],
+                write_mode=write_mode or get_settings().mcp_default_write_mode,
+                ttl_days=get_settings().mcp_token_ttl_days if ttl_days is None else ttl_days,
+            )
+        except DomainError as exc:
+            raise typer.BadParameter(exc.message) from exc
+        expiry = token.expires_at.date().isoformat() if token.expires_at else "never"
+        typer.echo(f"Created '{token.name}' for {email} ({token.scopes}, expires {expiry})")
+        typer.echo("Copy it now; it is not stored and cannot be shown again:")
+        typer.echo(f"  {raw}")
+
+
+@token_cli.command("list")
+def token_list(
+    email: Annotated[str | None, typer.Option(help="Only this user's tokens")] = None,
+) -> None:
+    """List tokens. The raw value is never shown."""
+    with session_scope() as db:
+        owner_id = _user_by_email(db, email).id if email else None
+        tokens = list_tokens(db, owner_id=owner_id)
+        if not tokens:
+            typer.echo("No tokens")
+            return
+        for token in tokens:
+            state = "revoked" if token.revoked_at else "active"
+            used = token.last_used_at.date().isoformat() if token.last_used_at else "never used"
+            typer.echo(
+                f"{token.prefix}  {token.name} ({token.user.email})  "
+                f"{token.scopes}/{token.write_mode}  {state}  {used}"
+            )
+
+
+@token_cli.command("revoke")
+def token_revoke(
+    prefix: Annotated[str, typer.Argument(help="Token prefix from `token list`")],
+    actor: Annotated[str | None, typer.Option(help="Acting admin's email")] = None,
+) -> None:
+    """Revoke a token by its prefix."""
+    with session_scope() as db:
+        token = db.scalar(
+            select(ApiToken).where(ApiToken.prefix == prefix.strip(), ApiToken.revoked_at.is_(None))
+        )
+        if token is None:
+            raise typer.BadParameter(f"No active token with prefix {prefix}")
+        try:
+            revoke_token(db, actor=_actor(db, actor), token=token)
+        except DomainError as exc:
+            raise typer.BadParameter(exc.message) from exc
+        typer.echo(f"Revoked '{token.name}' ({prefix})")
 
 
 if __name__ == "__main__":

@@ -1,4 +1,4 @@
-import { Columns3, LayoutDashboard, ListChecks, Settings } from "lucide-react";
+import { Columns3, KeyRound, LayoutDashboard, ListChecks, Settings } from "lucide-react";
 import { NavLink } from "react-router-dom";
 import { cn } from "@/lib/cn";
 import { useAuth } from "@/features/auth/useAuth";
@@ -7,6 +7,7 @@ const NAV = [
   { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, adminOnly: false },
   { to: "/items", label: "Items", icon: ListChecks, adminOnly: false },
   { to: "/board", label: "Board", icon: Columns3, adminOnly: false },
+  { to: "/tokens", label: "API tokens", icon: KeyRound, adminOnly: false },
   { to: "/admin", label: "Admin", icon: Settings, adminOnly: true },
 ];
 

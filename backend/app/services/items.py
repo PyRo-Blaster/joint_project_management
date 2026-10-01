@@ -2,17 +2,22 @@
 
 from dataclasses import dataclass
 from datetime import date
+from difflib import SequenceMatcher
 
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
 from app.constants import STATUS_LABELS
 from app.models import ActionItem, ItemUpdate, Program, User
 from app.models.base import utcnow
 from app.schemas.items import ItemBrief, ItemCreate, ItemOut, ItemPatch
+from app.services.agent_review import acknowledge_on_human_edit, pending_review_ids
 from app.services.audit import diff_changes, record_event
 from app.services.errors import ConflictError, InvalidInputError, NotFoundError
 from app.services.vocab import active_values
+
+ENTRY_NO_ATTEMPTS = 5
 
 SNAPSHOT_FIELDS = (
     "kind",
@@ -59,6 +64,7 @@ class ItemFilters:
     due_after: date | None = None
     q: str | None = None
     include_deleted: bool = False
+    needs_agent_review: bool = False
 
 
 def snapshot(item: ActionItem) -> dict:
@@ -86,6 +92,8 @@ def _apply_filters(stmt, filters: ItemFilters):
         stmt = stmt.where(ActionItem.due_on <= filters.due_before)
     if filters.due_after:
         stmt = stmt.where(ActionItem.due_on >= filters.due_after)
+    if filters.needs_agent_review:
+        stmt = stmt.where(ActionItem.id.in_(pending_review_ids()))
     if filters.q:
         pattern = f"%{filters.q.strip()}%"
         stmt = stmt.where(
@@ -126,6 +134,57 @@ def get_item(
     if item is None or item.program_id != program_id or hidden:
         raise NotFoundError("Item not found")
     return item
+
+
+def get_item_by_entry_no(db: Session, program_id: int, entry_no: int) -> ActionItem:
+    """Look an item up by the number both teams cite, not the internal id."""
+    item = db.scalar(
+        select(ActionItem).where(
+            ActionItem.program_id == program_id,
+            ActionItem.entry_no == entry_no,
+            ActionItem.deleted_at.is_(None),
+        )
+    )
+    if item is None:
+        raise NotFoundError(f"No item #{entry_no}")
+    return item
+
+
+def find_by_idempotency_key(db: Session, program_id: int, key: str) -> ActionItem | None:
+    return db.scalar(
+        select(ActionItem).where(
+            ActionItem.program_id == program_id, ActionItem.idempotency_key == key
+        )
+    )
+
+
+SIMILAR_TITLE_THRESHOLD = 0.82
+
+
+def _normal_title(title: str) -> str:
+    return " ".join(title.lower().split())
+
+
+def find_similar_items(
+    db: Session, program_id: int, title: str, *, limit: int = 3
+) -> list[tuple[ActionItem, float]]:
+    """Non-deleted items whose title is close to ``title``, best first.
+
+    Guards agent creates against silent drift: two rows for one commitment is
+    worse than a bad edit, because nothing in the history points at it.
+    """
+    wanted = _normal_title(title)
+    candidates = db.scalars(
+        select(ActionItem).where(
+            ActionItem.program_id == program_id, ActionItem.deleted_at.is_(None)
+        )
+    )
+    scored = [
+        (item, SequenceMatcher(None, wanted, _normal_title(item.title)).ratio())
+        for item in candidates
+    ]
+    close = [pair for pair in scored if pair[1] >= SIMILAR_TITLE_THRESHOLD]
+    return sorted(close, key=lambda pair: pair[1], reverse=True)[:limit]
 
 
 def next_entry_no(db: Session, program_id: int) -> int:
@@ -194,8 +253,45 @@ def _resolve_kind_and_status(item: ActionItem, data: dict) -> None:
         _validate_status_for_kind(item.kind, data["status"])
 
 
+def _insert_with_next_entry_no(
+    db: Session, program: Program, fields: dict, idempotency_key: str | None
+) -> ActionItem:
+    """Insert, taking the next entry number, and retry if a concurrent create took it.
+
+    The number is read as max + 1 outside any write lock, so two creates at the same
+    moment can pick the same one; the unique constraint stops the second. Nothing
+    else is pending in the session when an item is created, so rolling back and
+    reading the number again is safe.
+    """
+    for _ in range(ENTRY_NO_ATTEMPTS):
+        item = ActionItem(entry_no=next_entry_no(db, program.id), **fields)
+        db.add(item)
+        try:
+            db.flush()
+            return item
+        except IntegrityError as exc:
+            db.rollback()
+            if idempotency_key:
+                earlier = find_by_idempotency_key(db, program.id, idempotency_key)
+                if earlier is not None:
+                    raise ConflictError(
+                        f"Already filed as #{earlier.entry_no} with this idempotency key."
+                    ) from exc
+            if "entry_no" not in str(exc.orig):
+                raise
+    raise ConflictError(
+        "Could not assign an entry number: others were filing at the same moment. Try again."
+    )
+
+
 def create_item(
-    db: Session, *, actor: User, program: Program, data: ItemCreate, today: date | None = None
+    db: Session,
+    *,
+    actor: User,
+    program: Program,
+    data: ItemCreate,
+    today: date | None = None,
+    idempotency_key: str | None = None,
 ) -> ActionItem:
     today = today or date.today()
     payload = data.model_dump()
@@ -204,9 +300,8 @@ def create_item(
     if data.kind == "note":
         _validate_status_for_kind("note", data.status)
     status = None if data.kind == "note" else (data.status or "open")
-    item = ActionItem(
+    fields = dict(
         program_id=program.id,
-        entry_no=next_entry_no(db, program.id),
         kind=data.kind,
         title=data.title.strip(),
         details=data.details,
@@ -224,9 +319,9 @@ def create_item(
         file_path=data.file_path,
         created_by=actor.id,
         updated_by=actor.id,
+        idempotency_key=idempotency_key,
     )
-    db.add(item)
-    db.flush()
+    item = _insert_with_next_entry_no(db, program, fields, idempotency_key)
     record_event(
         db,
         actor=actor,
@@ -250,8 +345,16 @@ def _status_summary(item: ActionItem, changes: dict) -> str:
 
 
 def patch_item(
-    db: Session, *, actor: User, item: ActionItem, patch: ItemPatch, today: date | None = None
+    db: Session,
+    *,
+    actor: User,
+    item: ActionItem,
+    patch: ItemPatch,
+    today: date | None = None,
+    commit: bool = True,
 ) -> ActionItem:
+    """Apply a partial update. With ``commit=False`` the caller commits, so several
+    writes can land together or not at all."""
     today = today or date.today()
     if item.deleted_at is not None:
         raise ConflictError("Item is deleted; restore it first")
@@ -269,6 +372,7 @@ def patch_item(
         return item
     item.updated_by = actor.id
     item.updated_at = utcnow()
+    acknowledge_on_human_edit(db, item, actor)
     # A kind change also flips the status (an action↔note toggle), so describe it
     # as a general update rather than a bare "status changed … to None".
     is_status_change = "status" in changes and "kind" not in changes
@@ -284,8 +388,11 @@ def patch_item(
         changes=changes,
         program_id=item.program_id,
     )
-    db.commit()
-    db.refresh(item)
+    if commit:
+        db.commit()
+        db.refresh(item)
+    else:
+        db.flush()
     return item
 
 
@@ -327,8 +434,12 @@ def restore_item(db: Session, *, actor: User, item: ActionItem) -> ActionItem:
     return item
 
 
-def to_item_out(item: ActionItem, last_update_on: date | None = None) -> ItemOut:
-    return ItemOut.model_validate(item).model_copy(update={"last_update_on": last_update_on})
+def to_item_out(
+    item: ActionItem, last_update_on: date | None = None, needs_agent_review: bool = False
+) -> ItemOut:
+    return ItemOut.model_validate(item).model_copy(
+        update={"last_update_on": last_update_on, "needs_agent_review": needs_agent_review}
+    )
 
 
 def to_item_brief(item: ActionItem, last_update_on: date | None = None) -> ItemBrief:

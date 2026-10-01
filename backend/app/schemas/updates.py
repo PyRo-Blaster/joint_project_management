@@ -2,16 +2,17 @@ from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
+from app.constants import UPDATE_BODY_MAX
 from app.models import ItemUpdate, User
 
 
 class UpdateCreate(BaseModel):
-    body: str = Field(min_length=1)
+    body: str = Field(min_length=1, max_length=UPDATE_BODY_MAX)
     occurred_on: date | None = None
 
 
 class UpdatePatch(BaseModel):
-    body: str | None = Field(default=None, min_length=1)
+    body: str | None = Field(default=None, min_length=1, max_length=UPDATE_BODY_MAX)
     occurred_on: date | None = None
 
 

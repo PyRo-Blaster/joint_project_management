@@ -1,3 +1,4 @@
+import { UnreviewedBadge } from "@/components/domain/AgentBadges";
 import type { ReactNode } from "react";
 import { DueDate } from "@/components/domain/DueDate";
 import { KindBadge } from "@/components/domain/KindBadge";
@@ -40,6 +41,7 @@ export const COLUMNS: ColumnDef[] = [
       <span className="flex items-center gap-2">
         <span className="font-medium text-fg">{i.title}</span>
         {i.kind === "note" && <KindBadge kind="note" />}
+        {i.needs_agent_review && <UnreviewedBadge />}
       </span>
     ),
   },

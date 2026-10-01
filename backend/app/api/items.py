@@ -5,11 +5,12 @@ from typing import Annotated, Literal
 
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import AdminUser, CurrentUser, DbDep, ProgramDep
-from app.constants import MAX_PAGE_LIMIT, Kind, OwnerOrg, Priority, Status
+from app.api.deps import AdminUser, CurrentUser, DbDep, IdPath, ProgramDep, SessionUser
+from app.constants import MAX_DB_INT, MAX_PAGE, MAX_PAGE_LIMIT, Kind, OwnerOrg, Priority, Status
 from app.schemas.audit import AuditEventOut, to_audit_out
 from app.schemas.common import Envelope, Meta, ok
 from app.schemas.items import ItemCreate, ItemOut, ItemPatch
+from app.services.agent_review import acknowledge, review_flags
 from app.services.audit import item_history
 from app.services.items import (
     ItemFilters,
@@ -33,10 +34,11 @@ def item_filters(
     category: Annotated[list[str] | None, Query()] = None,
     owner_org: Annotated[list[OwnerOrg] | None, Query()] = None,
     kind: Kind | None = None,
-    assignee_id: int | None = None,
+    assignee_id: Annotated[int | None, Query(ge=1, le=MAX_DB_INT)] = None,
     due_before: date | None = None,
     due_after: date | None = None,
     q: str | None = None,
+    needs_agent_review: bool = False,
 ) -> ItemFilters:
     return ItemFilters(
         status=tuple(status or ()),
@@ -49,6 +51,7 @@ def item_filters(
         due_before=due_before,
         due_after=due_after,
         q=q,
+        needs_agent_review=needs_agent_review,
     )
 
 
@@ -56,7 +59,11 @@ FiltersDep = Annotated[ItemFilters, Depends(item_filters)]
 
 
 def _out(db, item):
-    return to_item_out(item, last_update_dates(db, [item.id]).get(item.id))
+    return to_item_out(
+        item,
+        last_update_dates(db, [item.id]).get(item.id),
+        review_flags(db, [item])[item.id],
+    )
 
 
 @router.get("", response_model=Envelope[list[ItemOut]])
@@ -67,15 +74,16 @@ def list_all(
     filters: FiltersDep,
     sort: str = "entry_no",
     direction: Literal["asc", "desc"] = "asc",
-    page: Annotated[int, Query(ge=1)] = 1,
+    page: Annotated[int, Query(ge=1, le=MAX_PAGE)] = 1,
     limit: Annotated[int, Query(ge=1, le=MAX_PAGE_LIMIT)] = 50,
 ):
     items, total = list_items(
         db, program.id, filters, sort=sort, direction=direction, page=page, limit=limit
     )
     latest = last_update_dates(db, [item.id for item in items])
+    flags = review_flags(db, items)
     return ok(
-        [to_item_out(item, latest.get(item.id)) for item in items],
+        [to_item_out(item, latest.get(item.id), flags[item.id]) for item in items],
         meta=Meta(total=total, page=page, limit=limit),
     )
 
@@ -86,28 +94,37 @@ def create(payload: ItemCreate, user: CurrentUser, db: DbDep, program: ProgramDe
 
 
 @router.get("/{item_id}", response_model=Envelope[ItemOut])
-def get_one(item_id: int, _user: CurrentUser, db: DbDep, program: ProgramDep):
+def get_one(item_id: IdPath, _user: CurrentUser, db: DbDep, program: ProgramDep):
     return ok(_out(db, get_item(db, program.id, item_id)))
 
 
 @router.patch("/{item_id}", response_model=Envelope[ItemOut])
-def patch(item_id: int, payload: ItemPatch, user: CurrentUser, db: DbDep, program: ProgramDep):
+def patch(item_id: IdPath, payload: ItemPatch, user: CurrentUser, db: DbDep, program: ProgramDep):
     item = patch_item(db, actor=user, item=get_item(db, program.id, item_id), patch=payload)
     return ok(_out(db, item))
 
 
 @router.delete("/{item_id}", response_model=Envelope[ItemOut])
-def soft_delete(item_id: int, user: CurrentUser, db: DbDep, program: ProgramDep):
+def soft_delete(item_id: IdPath, user: CurrentUser, db: DbDep, program: ProgramDep):
     return ok(_out(db, delete_item(db, actor=user, item=get_item(db, program.id, item_id))))
 
 
 @router.post("/{item_id}/restore", response_model=Envelope[ItemOut])
-def restore(item_id: int, admin: AdminUser, db: DbDep, program: ProgramDep):
+def restore(item_id: IdPath, admin: AdminUser, db: DbDep, program: ProgramDep):
     item = get_item(db, program.id, item_id, include_deleted=True)
     return ok(_out(db, restore_item(db, actor=admin, item=item)))
 
 
 @router.get("/{item_id}/history", response_model=Envelope[list[AuditEventOut]])
-def history(item_id: int, _user: CurrentUser, db: DbDep, program: ProgramDep):
+def history(item_id: IdPath, _user: CurrentUser, db: DbDep, program: ProgramDep):
     item = get_item(db, program.id, item_id, include_deleted=True)
     return ok([to_audit_out(event, actor) for event, actor in item_history(db, item.id)])
+
+
+@router.post("/{item_id}/ack", response_model=Envelope[ItemOut])
+def acknowledge_agent_changes(item_id: IdPath, user: SessionUser, db: DbDep, program: ProgramDep):
+    """A person confirms an agent's work on this item. Tokens are refused: an agent
+    marking its own work reviewed would defeat the point."""
+    item = get_item(db, program.id, item_id)
+    acknowledge(db, actor=user, item=item)
+    return ok(_out(db, item))

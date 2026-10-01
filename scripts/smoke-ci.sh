@@ -58,5 +58,25 @@ if [ "$(count)" != "1" ]; then
   exit 1
 fi
 
-echo "CI smoke passed: health ok, admin login, item create/read round-trips, SPA served"
+# MCP inside the container: mint a read token with the CLI, then list tools and
+# call cmc_whoami over streamable HTTP (design 11, protocol smoke).
+TOKEN="$(docker compose -p "$PROJECT" exec -T app python -m app.cli token create admin@example.com \
+  --name 'CI smoke' --scopes read | grep -oE 'cmct_[A-Za-z0-9_-]+')"
+mcp() {
+  curl -fsS -H 'Accept: application/json, text/event-stream' -H 'Content-Type: application/json' \
+    -H "Authorization: Bearer ${TOKEN}" -d "$1" "${BASE}/mcp/"
+}
+if ! mcp '{"jsonrpc":"2.0","id":1,"method":"tools/list","params":{}}' | grep -q '"cmc_whoami"'; then
+  echo "MCP tools/list did not offer cmc_whoami" >&2
+  docker compose -p "$PROJECT" logs app >&2
+  exit 1
+fi
+if ! mcp '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"cmc_whoami","arguments":{}}}' \
+  | grep -q 'Server version'; then
+  echo "MCP cmc_whoami failed" >&2
+  docker compose -p "$PROJECT" logs app >&2
+  exit 1
+fi
+
+echo "CI smoke passed: health ok, admin login, item create/read round-trips, MCP answers, SPA served"
 curl -fsS -o /dev/null -w 'root: %{http_code} %{content_type}\n' "${BASE}/"

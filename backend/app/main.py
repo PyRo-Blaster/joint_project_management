@@ -2,18 +2,21 @@
 
 import logging
 import uuid
+from contextlib import asynccontextmanager
 from pathlib import Path
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from fastapi.staticfiles import StaticFiles
+from sqlalchemy.exc import DataError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app import __version__
 from app.api.router import api_router
 from app.config import get_settings
 from app.constants import CSRF_HEADER, CSRF_VALUE, REQUEST_ID_HEADER
+from app.mcp import mcp_asgi_app
 from app.schemas.common import fail
 from app.services.errors import DomainError
 
@@ -37,11 +40,11 @@ def _validation_fields(exc: RequestValidationError) -> dict[str, str]:
 class SPAStaticFiles(StaticFiles):
     """Serve the built SPA, falling back to index.html for client-side routes.
 
-    Unknown ``/api/*`` paths keep the JSON envelope 404 instead of the SPA shell.
+    Unknown ``/api/*`` and ``/mcp/*`` paths keep a real 404 instead of the SPA shell.
     """
 
     async def get_response(self, path: str, scope):
-        if path == "api" or path.startswith("api/"):
+        if path in {"api", "mcp"} or path.startswith(("api/", "mcp/")):
             raise StarletteHTTPException(status_code=404, detail="Not Found")
         try:
             return await super().get_response(path, scope)
@@ -51,17 +54,57 @@ class SPAStaticFiles(StaticFiles):
             raise
 
 
+SECURITY_HEADERS = {
+    "X-Content-Type-Options": "nosniff",
+    "X-Frame-Options": "DENY",
+    # Export links carry their credential in the URL; never leak it as a referrer.
+    "Referrer-Policy": "no-referrer",
+}
+# Everything the app loads is its own. Styles allow inline because UI libraries
+# inject <style> elements; scripts do not.
+CONTENT_SECURITY_POLICY = (
+    "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+    "img-src 'self' data:; font-src 'self' data:; connect-src 'self'; object-src 'none'; "
+    "base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+)
+# Swagger UI at /api/docs loads its scripts from a CDN and inlines its bootstrap.
+CSP_EXEMPT_PREFIXES = ("/api/docs", "/docs/")
+
+
+def _with_security_headers(response: Response, path: str) -> Response:
+    for name, value in SECURITY_HEADERS.items():
+        response.headers.setdefault(name, value)
+    if not path.startswith(CSP_EXEMPT_PREFIXES):
+        response.headers.setdefault("Content-Security-Policy", CONTENT_SECURITY_POLICY)
+    return response
+
+
 def create_app() -> FastAPI:
     settings = get_settings()
     logging.basicConfig(level=settings.log_level.upper())
+    mcp_app = mcp_asgi_app(settings) if settings.mcp_enabled else None
+
+    @asynccontextmanager
+    async def lifespan(_app: FastAPI):
+        # The MCP session manager starts its task group inside its own lifespan.
+        # Mounting alone is not enough: the first request fails without this.
+        if mcp_app is None:
+            yield
+            return
+        async with mcp_app.router.lifespan_context(mcp_app):
+            yield
+
     app = FastAPI(
         title="Joint CMC Tracker",
         version=__version__,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
         redoc_url=None,
+        lifespan=lifespan,
     )
     app.include_router(api_router, prefix="/api")
+    if mcp_app is not None:
+        app.mount("/mcp", mcp_app)
 
     @app.middleware("http")
     async def request_context(request: Request, call_next):
@@ -76,12 +119,13 @@ def create_app() -> FastAPI:
                 f"Missing required header {CSRF_HEADER}: {CSRF_VALUE}",
                 request_id=request_id,
             )
-            return JSONResponse(
+            response = JSONResponse(
                 status_code=403, content=body, headers={REQUEST_ID_HEADER: request_id}
             )
+            return _with_security_headers(response, request.url.path)
         response = await call_next(request)
         response.headers[REQUEST_ID_HEADER] = request_id
-        return response
+        return _with_security_headers(response, request.url.path)
 
     @app.exception_handler(DomainError)
     async def handle_domain_error(request: Request, exc: DomainError):
@@ -92,6 +136,17 @@ def create_app() -> FastAPI:
     async def handle_validation_error(request: Request, exc: RequestValidationError):
         body = fail(
             "validation_error", "Invalid input", _validation_fields(exc), _request_id(request)
+        )
+        return JSONResponse(status_code=422, content=body)
+
+    @app.exception_handler(OverflowError)
+    @app.exception_handler(DataError)
+    async def handle_out_of_range(request: Request, exc: Exception):
+        # A number too large for the database column (bounded inputs make this rare).
+        body = fail(
+            "validation_error",
+            "A number in the request is out of range.",
+            request_id=_request_id(request),
         )
         return JSONResponse(status_code=422, content=body)
 

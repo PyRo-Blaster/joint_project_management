@@ -6,7 +6,7 @@ import pytest
 from sqlalchemy import inspect
 from sqlalchemy.exc import IntegrityError
 
-from app.models import ActionItem, Base
+from app.models import ActionItem, ApiToken, Base
 
 EXPECTED_TABLES = {
     "program",
@@ -17,6 +17,7 @@ EXPECTED_TABLES = {
     "item_update",
     "vocab_term",
     "audit_event",
+    "api_token",
 }
 
 
@@ -68,3 +69,41 @@ def test_entry_no_is_unique_per_program(db, program, raw_user):
     db.add(_item(program, raw_user, title="Duplicate entry number"))
     with pytest.raises(IntegrityError):
         db.commit()
+
+
+def _token(user, **overrides) -> ApiToken:
+    fields = {
+        "user_id": user.id,
+        "name": "Claude Code",
+        "token_hash": "a" * 64,
+        "prefix": "cmct_aaaaaaa",
+        "scopes": "read",
+        "write_mode": "interactive",
+        "created_by": user.id,
+    }
+    return ApiToken(**{**fields, **overrides})
+
+
+def test_api_token_rejects_an_unknown_write_mode(db, raw_user):
+    db.add(_token(raw_user, write_mode="wildcard"))
+    with pytest.raises(IntegrityError):
+        db.commit()
+
+
+def test_api_token_hash_is_unique(db, raw_user):
+    db.add(_token(raw_user))
+    db.commit()
+    db.add(_token(raw_user, name="Second"))
+    with pytest.raises(IntegrityError):
+        db.commit()
+
+
+def test_api_token_stores_its_owner(db, raw_user):
+    token = _token(raw_user, token_hash="b" * 64, scopes="read,write")
+    db.add(token)
+    db.commit()
+    db.refresh(token)
+    assert token.user.email == raw_user.email
+    assert token.scope_set == {"read", "write"}
+    assert token.revoked_at is None
+    assert token.created_at is not None
