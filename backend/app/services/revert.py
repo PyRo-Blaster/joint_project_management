@@ -8,6 +8,7 @@ regulated change history is supposed to show.
 
 from datetime import date, datetime, timedelta
 
+from sqlalchemy import update
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
@@ -90,6 +91,17 @@ def revert_event(db: Session, *, actor: User, event: AuditEvent) -> AuditEvent:
         program_id=item.program_id,
     )
     db.flush()
+    # Claim the original with a compare-and-set: two people undoing the same change
+    # at once both pass the checks above, and only the first may land.
+    claimed = db.execute(
+        update(AuditEvent)
+        .where(AuditEvent.id == event.id, AuditEvent.reverted_by_event_id.is_(None))
+        .values(reverted_by_event_id=undo.id)
+        .execution_options(synchronize_session=False)
+    )
+    if claimed.rowcount != 1:
+        db.rollback()
+        raise ConflictError("This change was already undone.")
     event.reverted_by_event_id = undo.id
     db.commit()
     db.refresh(undo)

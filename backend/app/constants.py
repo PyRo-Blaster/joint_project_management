@@ -54,6 +54,12 @@ SESSION_COOKIE = "cmc_session"
 CSRF_HEADER = "X-Requested-With"
 CSRF_VALUE = "fetch"
 REQUEST_ID_HEADER = "X-Request-ID"
+# Ids are INTEGER columns: anything larger cannot exist, and binding it crashes the
+# driver (OverflowError on SQLite, out-of-range on PostgreSQL). Inputs are bounded by it.
+MAX_DB_INT = 2_147_483_647
+UPDATE_BODY_MAX = 20_000
+# Deep enough for any real listing; bounded so page * limit stays a valid OFFSET.
+MAX_PAGE = 100_000
 TOKEN_PREFIX = "cmct_"
 TOKEN_PREFIX_LENGTH = 12
 BEARER_SCHEME = "bearer "

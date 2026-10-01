@@ -19,6 +19,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
+from app.constants import MAX_DB_INT, UPDATE_BODY_MAX
 from app.mcp.confirm import issue, verify
 from app.mcp.lookup import parse_date, resolve_item
 from app.mcp.render import truncate
@@ -44,16 +45,19 @@ class BatchChange(BaseModel):
 
     model_config = ConfigDict(extra="forbid")
 
-    entry_no: int
+    entry_no: Annotated[int, Field(ge=1, le=MAX_DB_INT)]
     status: str | None = None
     due_on: Annotated[str | None, Field(description="ISO date; empty string clears")] = None
     priority: Annotated[str | None, Field(description="p1, p2, p3; empty clears")] = None
     category: Annotated[str | None, Field(description="empty string clears")] = None
-    assignee_id: Annotated[int | None, Field(description="0 unassigns")] = None
+    assignee_id: Annotated[int | None, Field(ge=0, le=MAX_DB_INT, description="0 unassigns")] = None
     details: str | None = None
     notes_risks: str | None = None
     file_path: str | None = None
-    post: Annotated[str | None, Field(description="A dated note for the timeline")] = None
+    post: Annotated[
+        str | None,
+        Field(max_length=UPDATE_BODY_MAX, description="A dated note for the timeline"),
+    ] = None
     occurred_on: Annotated[str | None, Field(description="Date for the post")] = None
 
 
@@ -84,9 +88,14 @@ def register(server: MCPServer) -> None:
     )
     async def cmc_set_status(
         ctx: Context,
-        entry_no: Annotated[int, Field(description="The item's number, as in '#42'")],
+        entry_no: Annotated[
+            int, Field(ge=1, le=MAX_DB_INT, description="The item's number, as in '#42'")
+        ],
         status: Annotated[str, Field(description="open, in_progress, blocked, on_hold, ...")],
-        note: Annotated[str | None, Field(description="Why, posted to the timeline")] = None,
+        note: Annotated[
+            str | None,
+            Field(max_length=UPDATE_BODY_MAX, description="Why, posted to the timeline"),
+        ] = None,
         confirm: Annotated[str | None, Field(description="Token from the preview")] = None,
     ) -> str:
         request = {"entry_no": entry_no, "status": status, "note": note or ""}
@@ -109,11 +118,15 @@ def register(server: MCPServer) -> None:
     )
     async def cmc_update_item(
         ctx: Context,
-        entry_no: Annotated[int, Field(description="The item's number, as in '#42'")],
+        entry_no: Annotated[
+            int, Field(ge=1, le=MAX_DB_INT, description="The item's number, as in '#42'")
+        ],
         due_on: Annotated[str | None, Field(description="ISO date; empty clears")] = None,
         priority: Annotated[str | None, Field(description="p1, p2, p3; empty clears")] = None,
         category: Annotated[str | None, Field(description="Active category; empty clears")] = None,
-        assignee_id: Annotated[int | None, Field(description="0 unassigns")] = None,
+        assignee_id: Annotated[
+            int | None, Field(ge=0, le=MAX_DB_INT, description="0 unassigns")
+        ] = None,
         details: str | None = None,
         notes_risks: str | None = None,
         file_path: str | None = None,

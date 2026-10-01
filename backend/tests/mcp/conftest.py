@@ -123,8 +123,7 @@ def mcp_writer(mcp_as):
 
 
 @pytest.fixture
-def anonymous_mcp_client(app, cli_db):
+def raw_mcp_http(app, cli_db):
+    """A bare HTTP client for the /mcp transport, for requests the gate must refuse."""
     with TestClient(app) as client:
-        mcp = McpClient(client, None)
-        mcp.initialize()
-        yield mcp
+        yield client

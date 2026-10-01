@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.deps import DbDep, SessionUser, SettingsDep
+from app.api.deps import DbDep, IdPath, SessionUser, SettingsDep
 from app.models.base import utcnow
 from app.schemas.common import Envelope, ok
 from app.schemas.tokens import TokenCreate, TokenCreated, TokenOut, to_token_out
@@ -39,6 +39,6 @@ def create(payload: TokenCreate, user: SessionUser, db: DbDep, settings: Setting
 
 
 @router.delete("/{token_id}", response_model=Envelope[TokenOut])
-def revoke(token_id: int, user: SessionUser, db: DbDep):
+def revoke(token_id: IdPath, user: SessionUser, db: DbDep):
     token = revoke_token(db, actor=user, token=get_token(db, token_id))
     return ok(to_token_out(token, now=utcnow()))

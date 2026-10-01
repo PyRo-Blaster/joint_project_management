@@ -2,7 +2,7 @@
 
 from fastapi import APIRouter
 
-from app.api.deps import CurrentUser, DbDep, ProgramDep
+from app.api.deps import CurrentUser, DbDep, IdPath, ProgramDep
 from app.schemas.common import Envelope, ok
 from app.schemas.updates import UpdateCreate, UpdateOut, UpdatePatch, to_update_out
 from app.services.items import get_item
@@ -19,13 +19,15 @@ router = APIRouter(prefix="/items/{item_id}/updates", tags=["updates"])
 
 
 @router.get("", response_model=Envelope[list[UpdateOut]])
-def list_all(item_id: int, _user: CurrentUser, db: DbDep, program: ProgramDep):
+def list_all(item_id: IdPath, _user: CurrentUser, db: DbDep, program: ProgramDep):
     item = get_item(db, program.id, item_id, include_deleted=True)
     return ok([to_update_out(update, author) for update, author in list_updates(db, item)])
 
 
 @router.post("", response_model=Envelope[UpdateOut], status_code=201)
-def create(item_id: int, payload: UpdateCreate, user: CurrentUser, db: DbDep, program: ProgramDep):
+def create(
+    item_id: IdPath, payload: UpdateCreate, user: CurrentUser, db: DbDep, program: ProgramDep
+):
     item = get_item(db, program.id, item_id)
     update = create_update(
         db, actor=user, item=item, body=payload.body, occurred_on=payload.occurred_on
@@ -35,8 +37,8 @@ def create(item_id: int, payload: UpdateCreate, user: CurrentUser, db: DbDep, pr
 
 @router.patch("/{update_id}", response_model=Envelope[UpdateOut])
 def patch(
-    item_id: int,
-    update_id: int,
+    item_id: IdPath,
+    update_id: IdPath,
     payload: UpdatePatch,
     user: CurrentUser,
     db: DbDep,
@@ -55,7 +57,7 @@ def patch(
 
 
 @router.delete("/{update_id}", response_model=Envelope[None])
-def remove(item_id: int, update_id: int, user: CurrentUser, db: DbDep, program: ProgramDep):
+def remove(item_id: IdPath, update_id: IdPath, user: CurrentUser, db: DbDep, program: ProgramDep):
     item = get_item(db, program.id, item_id)
     delete_update(db, actor=user, item=item, update=get_update(db, item, update_id))
     return ok(None)

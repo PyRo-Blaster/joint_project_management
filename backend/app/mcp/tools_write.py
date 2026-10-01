@@ -15,7 +15,7 @@ from pydantic import Field
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.constants import OWNER_LABELS, TITLE_MAX_LENGTH
+from app.constants import MAX_DB_INT, OWNER_LABELS, TITLE_MAX_LENGTH, UPDATE_BODY_MAX
 from app.mcp.lookup import parse_date, resolve_item
 from app.mcp.render import truncate
 from app.mcp.runtime import Caller, call_tool
@@ -53,8 +53,12 @@ def register(server: MCPServer) -> None:
     )
     async def cmc_post_update(
         ctx: Context,
-        entry_no: Annotated[int, Field(description="The item's number, as in '#42'")],
-        body: Annotated[str, Field(description="What happened, in plain English")],
+        entry_no: Annotated[
+            int, Field(ge=1, le=MAX_DB_INT, description="The item's number, as in '#42'")
+        ],
+        body: Annotated[
+            str, Field(max_length=UPDATE_BODY_MAX, description="What happened, in plain English")
+        ],
         occurred_on: Annotated[
             str | None, Field(description="ISO date the news is from; defaults to today")
         ] = None,
@@ -97,7 +101,9 @@ def register(server: MCPServer) -> None:
         raised_on: Annotated[str | None, Field(description="ISO date; defaults to today")] = None,
         details: str = "",
         notes_risks: str = "",
-        assignee_id: Annotated[int | None, Field(description="From cmc_list_vocabulary")] = None,
+        assignee_id: Annotated[
+            int | None, Field(ge=1, le=MAX_DB_INT, description="From cmc_list_vocabulary")
+        ] = None,
         source: Annotated[str | None, Field(description="e.g. 'JSC meeting 2026-09-24'")] = None,
         file_path: str = "",
         idempotency_key: Annotated[

@@ -40,6 +40,18 @@ def call(name: str, headers: dict | None = None, **arguments) -> tuple[bool, str
     return bool(result.get("isError")), text
 
 
+def refusal_of(method: str, headers: dict) -> tuple[int, str, str]:
+    """POST a request that must be refused; return its status, challenge and message."""
+    body = json.dumps({"jsonrpc": "2.0", "id": 0, "method": method, "params": {}}).encode()
+    request = urllib.request.Request(f"{BASE}/mcp/", data=body, headers=headers, method="POST")
+    try:
+        with urllib.request.urlopen(request, timeout=20) as response:
+            return response.status, "", response.read().decode()
+    except urllib.error.HTTPError as error:
+        message = json.loads(error.read()).get("error", {}).get("message", "")
+        return error.code, error.headers.get("WWW-Authenticate", ""), message
+
+
 def login() -> str:
     """Sign in as the seeded admin and return the session cookie."""
     body = json.dumps(
@@ -175,10 +187,18 @@ def main() -> int:
 
     print("auth")
     anonymous = {key: value for key, value in HEADERS.items() if key != "Authorization"}
-    error, text = call("cmc_whoami", headers=anonymous)
-    check("no token is refused with instructions", error and "Bearer cmct_" in text, text)
-    error, text = call("cmc_whoami", headers={**HEADERS, "Authorization": "Bearer cmct_x"})
-    check("bad token is refused", error and "not recognised" in text, text)
+    status, challenge, text = refusal_of("initialize", anonymous)
+    check(
+        "no token: even the handshake is 401 with a challenge",
+        status == 401 and challenge.startswith("Bearer") and "Bearer cmct_" in text,
+        f"{status} {challenge} {text}",
+    )
+    status, challenge, text = refusal_of("tools/list", {**HEADERS, "Authorization": "Bearer cmct_x"})
+    check(
+        "bad token is 401 invalid_token, saying why",
+        status == 401 and "invalid_token" in challenge and "not recognised" in text,
+        f"{status} {challenge} {text}",
+    )
 
     print("REST is read-only to tokens")
     request = urllib.request.Request(

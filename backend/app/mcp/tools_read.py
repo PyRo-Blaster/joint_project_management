@@ -13,6 +13,8 @@ from sqlalchemy.orm import Session
 from app import __version__
 from app.constants import (
     ENTITY_TYPES,
+    MAX_DB_INT,
+    MAX_PAGE,
     MAX_PAGE_LIMIT,
     OWNER_LABELS,
     OWNER_ORGS,
@@ -97,13 +99,13 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         category: list[str] | None = None,
         owner_org: Annotated[list[str] | None, Field(description="gensci, yarrow or joint")] = None,
         kind: Annotated[str | None, Field(description="action or note")] = None,
-        assignee_id: int | None = None,
+        assignee_id: Annotated[int | None, Field(ge=1, le=MAX_DB_INT)] = None,
         due_before: Annotated[str | None, Field(description="ISO date, e.g. 2026-10-01")] = None,
         due_after: str | None = None,
         limit: Annotated[int, Field(description="1 to 100", ge=1, le=SEARCH_LIMIT_MAX)] = (
             SEARCH_LIMIT_DEFAULT
         ),
-        page: Annotated[int, Field(ge=1)] = 1,
+        page: Annotated[int, Field(ge=1, le=MAX_PAGE)] = 1,
         sort: Annotated[
             str, Field(description="entry_no, title, status, priority, due_on, raised_on, ...")
         ] = "entry_no",
@@ -137,7 +139,9 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
     )
     async def cmc_get_item(
         ctx: Context,
-        entry_no: Annotated[int, Field(description="The number people cite, as in '#42'")],
+        entry_no: Annotated[
+            int, Field(ge=1, le=MAX_DB_INT, description="The number people cite, as in '#42'")
+        ],
         include_updates: Annotated[int, Field(ge=0, le=50)] = 5,
         include_history: Annotated[
             bool, Field(description="Also return every recorded change, old to new")
@@ -158,9 +162,9 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
     )
     async def cmc_list_updates(
         ctx: Context,
-        entry_no: int,
+        entry_no: Annotated[int, Field(ge=1, le=MAX_DB_INT)],
         limit: Annotated[int, Field(ge=1, le=MAX_PAGE_LIMIT)] = 20,
-        page: Annotated[int, Field(ge=1)] = 1,
+        page: Annotated[int, Field(ge=1, le=MAX_PAGE)] = 1,
     ) -> str:
         return await call_tool(
             ctx, lambda db, caller, program: _list_updates(db, program, entry_no, limit, page)
@@ -175,7 +179,9 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         ),
         annotations=READ_ONLY,
     )
-    async def cmc_get_item_history(ctx: Context, entry_no: int) -> str:
+    async def cmc_get_item_history(
+        ctx: Context, entry_no: Annotated[int, Field(ge=1, le=MAX_DB_INT)]
+    ) -> str:
         return await call_tool(ctx, lambda db, caller, program: _history(db, program, entry_no))
 
     @server.tool(
@@ -194,7 +200,9 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
             Field(description="Which list to return; 'all' returns each in turn"),
         ] = "all",
         owner_org: Annotated[str | None, Field(description="gensci, yarrow or joint")] = None,
-        assignee_id: Annotated[int | None, Field(description="From cmc_list_vocabulary")] = None,
+        assignee_id: Annotated[
+            int | None, Field(ge=1, le=MAX_DB_INT, description="From cmc_list_vocabulary")
+        ] = None,
     ) -> str:
         return await call_tool(
             ctx,
@@ -216,8 +224,10 @@ def register(server: MCPServer) -> None:  # noqa: C901 - one registration per to
         ctx: Context,
         since: Annotated[str | None, Field(description="ISO date, e.g. 2026-09-01")] = None,
         limit: Annotated[int, Field(ge=1, le=MAX_PAGE_LIMIT)] = ACTIVITY_LIMIT_DEFAULT,
-        page: Annotated[int, Field(ge=1)] = 1,
-        actor_id: Annotated[int | None, Field(description="Only this person's changes")] = None,
+        page: Annotated[int, Field(ge=1, le=MAX_PAGE)] = 1,
+        actor_id: Annotated[
+            int | None, Field(ge=1, le=MAX_DB_INT, description="Only this person's changes")
+        ] = None,
         entity_type: Annotated[
             str | None, Field(description="item, user, invitation, vocab_term, import, api_token")
         ] = None,
