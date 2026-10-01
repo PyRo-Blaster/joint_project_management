@@ -57,6 +57,11 @@ required variable. Agents authenticate with API tokens, which people create at
 - **`MCP_ALLOWED_HOSTS`** turns on the SDK's Host-header check. It is off by
   default because `/mcp` accepts bearer tokens only, never the session cookie.
   If you set it, list every name clients use, e.g. `tracker.example.com`.
+- **Every `/mcp/` request needs a token**, even the protocol handshake: without
+  one it answers 401 with `WWW-Authenticate: Bearer`. Point uptime checks at
+  `/api/health`, not `/mcp/`.
+- **Security headers** (`nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+  a Content-Security-Policy) come from the app itself; the proxy adds nothing.
 - **Kill switches.** `MCP_WRITES_ENABLED=false` stops every agent write and
   leaves reads working; `MCP_ENABLED=false` removes the endpoint. Both take
   effect on restart. Revoking a single token takes effect on its next call.
