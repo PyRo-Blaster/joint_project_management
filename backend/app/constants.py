@@ -99,6 +99,10 @@ SEED_CATEGORIES: tuple[str, ...] = (
 OWNER_ALIASES = {
     "org_a": "org_a",
     "org_b": "org_b",
+    "organization a": "org_a",
+    "organization b": "org_b",
+    "organization a/organization b": "joint",
+    "organization b/organization a": "joint",
     "org_a/org_b": "joint",
     "org_b/org_a": "joint",
     "joint": "joint",
