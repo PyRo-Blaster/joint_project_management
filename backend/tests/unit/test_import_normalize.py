@@ -30,7 +30,9 @@ def _raw(**values):
         "entry_no": 7,
         "date": "2026/02/05 ~ 2026/02/06",
         "group": "General Issues",
-        "action_item": "Organization A to confirm whether the USP compendial assays also comply with EP?",
+        "action_item": (
+            "Organization A to confirm whether the USP compendial assays also comply with EP?"
+        ),
         "translation": "Organization A确认USP药典检测是否也符合EP？",
         "owner": "Organization A",
         "category": "QC",
@@ -99,7 +101,9 @@ def test_normalize_action_row():
     assert row.due_on == date(2026, 6, 30)
     assert row.notes_risks == ""
     assert row.file_path == "08 Quality Control/Stability"
-    assert row.updates == (UpdateDraft(date(2026, 2, 5), "Feedback from Organization A QC \n[NO UPDATE]"),)
+    assert row.updates == (
+        UpdateDraft(date(2026, 2, 5), "Feedback from Organization A QC \n[NO UPDATE]"),
+    )
     assert row.provenance["translation"] == "Organization A确认USP药典检测是否也符合EP？"
     assert row.provenance["excel_row"] == 3
     assert row.warnings == ()

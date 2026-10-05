@@ -77,7 +77,11 @@ STATUS_LABELS = {
     "completed": "Completed",
     "cancelled": "Cancelled",
 }
-OWNER_LABELS = {"org_a": "Organization A", "org_b": "Organization B", "joint": "Organization A/Organization B"}
+OWNER_LABELS = {
+    "org_a": "Organization A",
+    "org_b": "Organization B",
+    "joint": "Organization A/Organization B",
+}
 PRIORITY_LABELS = {"p1": "P1", "p2": "P2", "p3": "P3"}
 
 SEED_GROUPS: tuple[str, ...] = ("General Issues", "Gen1 (existing) CMC", "Gen2 (Process 2.0) CMC")

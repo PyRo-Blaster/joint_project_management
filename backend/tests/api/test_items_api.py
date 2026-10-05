@@ -58,8 +58,7 @@ def test_list_filters_search_sort_and_pagination(member_client, vocab):
     assert [i["title"] for i in only_blocked] == ["SCX category justification"]
     assert member_client.get("/api/items?q=licence").json()["meta"]["total"] == 1
     assert (
-        member_client.get("/api/items?owner_org=joint&owner_org=org_b").json()["meta"]["total"]
-        == 2
+        member_client.get("/api/items?owner_org=joint&owner_org=org_b").json()["meta"]["total"] == 2
     )
     assert (
         member_client.get("/api/items?priority=p1").json()["data"][0]["title"]
