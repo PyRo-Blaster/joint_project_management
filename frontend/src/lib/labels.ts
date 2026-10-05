@@ -15,7 +15,10 @@ export const OWNER_LABELS: Record<OwnerOrg, string> = {
   joint: "Organization A/Organization B",
 };
 
-export const ORG_LABELS: Record<string, string> = { org_a: "Organization A", org_b: "Organization B" };
+export const ORG_LABELS: Record<string, string> = {
+  org_a: "Organization A",
+  org_b: "Organization B",
+};
 export const PRIORITY_LABELS: Record<Priority, string> = { p1: "P1", p2: "P2", p3: "P3" };
 export const KIND_LABELS: Record<Kind, string> = { action: "Action", note: "Note" };
 

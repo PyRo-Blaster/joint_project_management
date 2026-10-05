@@ -77,7 +77,11 @@ STATUS_LABELS = {
     "completed": "Completed",
     "cancelled": "Cancelled",
 }
-OWNER_LABELS = {"org_a": "Organization A", "org_b": "Organization B", "joint": "Organization A/Organization B"}
+OWNER_LABELS = {
+    "org_a": "Organization A",
+    "org_b": "Organization B",
+    "joint": "Organization A/Organization B",
+}
 PRIORITY_LABELS = {"p1": "P1", "p2": "P2", "p3": "P3"}
 
 SEED_GROUPS: tuple[str, ...] = ("General Issues", "Gen1 (existing) CMC", "Gen2 (Process 2.0) CMC")
@@ -95,6 +99,10 @@ SEED_CATEGORIES: tuple[str, ...] = (
 OWNER_ALIASES = {
     "org_a": "org_a",
     "org_b": "org_b",
+    "organization a": "org_a",
+    "organization b": "org_b",
+    "organization a/organization b": "joint",
+    "organization b/organization a": "joint",
     "org_a/org_b": "joint",
     "org_b/org_a": "joint",
     "joint": "joint",

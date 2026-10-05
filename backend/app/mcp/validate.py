@@ -34,7 +34,14 @@ STATUS_SYNONYMS = {
     "new": "open",
     "todo": "open",
 }
-OWNER_SYNONYMS = {"both": "joint", "org_a/org_b": "joint", "org_b/org_a": "joint"}
+OWNER_SYNONYMS = {
+    "both": "joint",
+    "org_a/org_b": "joint",
+    "org_b/org_a": "joint",
+    "organization a": "org_a",
+    "organization b": "org_b",
+    "organization a/organization b": "joint",
+}
 
 
 def _suggest(value: str, valid: Sequence[str], synonyms: dict[str, str]) -> str | None:
